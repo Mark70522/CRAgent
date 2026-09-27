@@ -1,0 +1,115 @@
+# Machine-checked rules. Re-read on every validate_* call, so edits take effect immediately.
+#
+# Rule types: required, required_if, min_length, max_length, enum, regex, forbidden_words,
+#             date_order, tasks_min, tasks_within_window, tasks_sequential, tasks_field_required
+# Optional "when": {field, equals|not_equals|contains|in|blank} makes a rule conditional.
+# severity: error (blocks create_change) | warn (reported only). Default error.
+#
+# Keep ids stable (HR-001 ...). Record every addition in changelog.md with who asked and why.
+
+rules:
+  - id: HR-001
+    description: Title must start with a type tag
+    type: regex
+    field: short_description
+    pattern: "^\\[(PATCH|RELEASE|CONFIG|INFRA|DB)\\] .{10,}"
+    suggestion: "Use '[PATCH] <servers> - <what>' or '[RELEASE] <app> <version> to <env>'"
+
+  - id: HR-002
+    description: Description must be detailed
+    type: min_length
+    field: description
+    min: 200
+    suggestion: Cover object, content/patch list, impact, steps, verification and backout
+
+  - id: HR-003
+    description: Description must not contain unfilled placeholders
+    type: forbidden_words
+    field: description
+    values: ["<TODO", "TBD", "待填"]
+
+  - id: HR-004
+    description: CI is required
+    type: required
+    field: cmdb_ci
+
+  - id: HR-005
+    description: Assignment group is required
+    type: required
+    field: assignment_group
+
+  - id: HR-006
+    description: Change type must be a valid value
+    type: enum
+    field: type
+    values: [standard, normal, emergency]
+
+  - id: HR-007
+    description: Risk must be a valid value
+    type: enum
+    field: risk
+    values: [Low, Moderate, High, Very High]
+
+  - id: HR-008
+    description: Planned window must be consistent
+    type: date_order
+
+  - id: HR-009
+    description: Justification is required
+    type: required
+    field: justification
+
+  - id: HR-010
+    description: Implementation plan is required
+    type: required
+    field: implementation_plan
+
+  - id: HR-011
+    description: Backout plan is required for normal and emergency changes
+    type: required_if
+    field: backout_plan
+    when: { field: type, in: [normal, emergency] }
+    suggestion: State how to roll back and how long it takes; say if it was rehearsed
+
+  - id: HR-012
+    description: Test plan is required for normal and emergency changes
+    type: required_if
+    field: test_plan
+    when: { field: type, in: [normal, emergency] }
+
+  - id: HR-013
+    description: At least two change tasks
+    type: tasks_min
+    min: 2
+    suggestion: Split into pre-check, implementation, validation, closure
+
+  - id: HR-014
+    description: Every task must be planned inside the change window
+    type: tasks_within_window
+
+  - id: HR-015
+    description: Tasks must not overlap and must run in order
+    type: tasks_sequential
+
+  - id: HR-016
+    description: Every task needs an assignment group
+    type: tasks_field_required
+    field: assignment_group
+
+  - id: HR-017
+    description: Title should not be too long
+    type: max_length
+    field: short_description
+    max: 120
+    severity: warn
+
+  # The usual window is Sunday 00:00-06:00, but the user may deliberately shift it.
+  # severity: warn -> reported, does not block create_change. The agent must ask the user to confirm.
+  - id: HR-018
+    description: Change is outside the usual maintenance window (Sunday 00:00-06:00)
+    type: maintenance_window
+    days: [SUNDAY]
+    from: "00:00"
+    to: "06:00"
+    severity: warn
+    suggestion: Confirm with the user that this time is intended; if not, move it to the next Sunday 00:00-06:00

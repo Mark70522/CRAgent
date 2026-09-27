@@ -1,0 +1,49 @@
+# ============================================================================
+#  cr-agent 唯一需要改的配置文件
+#
+#  复制成 cr-agent.yml (已在 .gitignore 里, 不会被提交), 按你们的实例填。
+#  本机测试: 保持 mock: true, 其他都不用填。
+# ============================================================================
+
+# ---- 服务器清单: 你们的 Excel ----
+inventory:
+  file: ./knowledge/inventory.xlsx      # 也支持 .csv; 留空则改查 ServiceNow CMDB
+  sheet: ""                             # 空 = 第一个 sheet
+  maintenance-window: "Sun 00:00-06:00" # 表里没填窗口的服务器用这个 (只是展示; 真正的检查在 hard-rules.yaml HR-018)
+  columns:                              # 表头叫什么就写什么 (不分大小写, 空格/下划线随意)
+    service: Service
+    environment: Environment
+    server: Server
+    ip: IP                              # 下面四列可选, 表里没有就删掉这行
+    os: OS
+    owner-group: Owner Group
+    maintenance-window: Maintenance Window
+
+servicenow:
+  # true  = 内存假实例, 本机开发/演示用, 不需要网络
+  # false = 连公司 ServiceNow
+  mock: true
+
+  # ---- 接公司实例时填下面这些 ----
+  instance: https://company.service-now.com
+  user: svc_cr_agent
+  password: ""            # 二选一: 填 password, 或者填 token
+  token: ""
+
+  # ---- 下面两项只在 inventory.file 留空、改查 CMDB 时才用 ----
+  ci-table: cmdb_ci_server
+  ci-fields:
+    name: name
+    ip-address: ip_address
+    os: os
+    environment: u_environment            # prod / uat / dev 存在哪一列
+    owner-group: support_group            # 负责组
+    business-app: u_business_application  # 所属业务应用
+    maintenance-schedule: maintenance_schedule
+
+  # 同步历史时只拉这些状态的 CR (标准 ITSM: 3=Closed 4=Canceled 7=Closed 其他 -4=Canceled)
+  closed-states: "3,4,7,-4"
+
+  # 走代理时打开
+  # proxy-host: proxy.company.com
+  # proxy-port: 8080

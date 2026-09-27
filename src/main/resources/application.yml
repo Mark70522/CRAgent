@@ -1,0 +1,47 @@
+# Internal defaults. Do NOT edit this for your instance: put company settings in ./cr-agent.yml
+# (see cr-agent.example.yml). Paths are relative to the working directory, which
+# .vscode/mcp.json sets to the project folder.
+
+spring:
+  config:
+    import: optional:file:./cr-agent.yml
+  main:
+    banner-mode: off
+    web-application-type: none
+  ai:
+    mcp:
+      server:
+        name: cr-agent
+        version: 0.1.0
+        type: SYNC
+        stdio: true
+  datasource:
+    url: jdbc:sqlite:./history.db
+    driver-class-name: org.sqlite.JDBC
+  sql:
+    init:
+      mode: always
+
+# File only: stdout is the MCP protocol channel (see logback-spring.xml).
+logging:
+  file:
+    name: ./logs/cr-agent.log
+
+cr:
+  knowledge-dir: ./knowledge
+
+# Server inventory. Blank file = use the ServiceNow CMDB instead.
+inventory:
+  file: ./knowledge/inventory.xlsx
+  sheet: ""
+  maintenance-window: "Sun 00:00-06:00"
+
+servicenow:
+  mock: true
+  instance: ""
+  user: ""
+  password: ""
+  token: ""
+  ci-table: cmdb_ci_server
+  closed-states: "3,4,7,-4"
+  timeout-ms: 30000

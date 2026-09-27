@@ -1,0 +1,51 @@
+name: db-patch
+description: Database patching (Oracle RU/PSU, SQL Server CU, PostgreSQL minor upgrade)
+match_keywords: [oracle, sql server, postgres, mysql, ru, psu, cu, database patch, 数据库补丁]
+
+fields:
+  type: normal
+  category: Software
+  risk: High
+  impact: 2 - Medium
+  justification: "Database patch required for security / vendor support compliance"
+  implementation_plan: "Execute the change tasks in order; DBA on duty owns every task."
+  backout_plan: "Rollback the patch with the vendor tool (opatch rollback / CU uninstall), approx. 40 minutes; rehearsed in UAT."
+  test_plan: "Patch inventory shows new version, instance opens, application connection pool recovers, key SQL timings compared with baseline."
+
+short_description_pattern: "[DB] {ci_list} - {summary}"
+
+default_duration_minutes: 240
+
+tasks:
+  - order: 10
+    short_description: "Backup and pre-check"
+    description: "Full backup or verified restore point, stop application connections"
+    duration_minutes: 30
+    assignment_group: "{ci_owner_group}"
+  - order: 20
+    short_description: "Apply database patch"
+    duration_minutes: 90
+    assignment_group: "{ci_owner_group}"
+  - order: 30
+    short_description: "Post-patch scripts and validation"
+    description: "datapatch / post-install scripts, inventory check, open instance"
+    duration_minutes: 60
+    assignment_group: "{ci_owner_group}"
+  - order: 40
+    short_description: "Release to application and monitor"
+    duration_minutes: 30
+    assignment_group: "{ci_owner_group}"
+
+description_sections:
+  - heading: 变更对象
+    hint: 数据库服务器、实例名、版本、所属应用
+  - heading: 补丁内容
+    hint: 补丁编号 (MOS patch / CU 号)、目标版本、vendor 说明
+  - heading: 影响范围
+    hint: 停机时长、受影响应用、业务方确认情况
+  - heading: 执行步骤
+    hint: 见 change tasks,说明关键检查点
+  - heading: 验证方法
+    hint: 版本检查、应用连通、性能对比
+  - heading: 回退方案
+    hint: 回退命令、耗时、是否在 UAT 演练
