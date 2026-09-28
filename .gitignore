@@ -1,0 +1,8 @@
+target/
+logs/
+history.db
+*.db-journal
+.idea/
+*.iml
+.env
+cr-agent.yml

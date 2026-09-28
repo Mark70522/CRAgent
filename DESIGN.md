@@ -190,14 +190,16 @@ scripts/encoding_check.py            验证 stdout 是 UTF-8
 - **`ChangeDraft` 是 record**:Spring AI 从 record 自动生成 JSON schema 给 Copilot,字段名和 `@ToolParam` 描述就是 Copilot 看到的"表单"。自定义字段走 `extra` map。
 - **规则文件每次重读**:`RuleEngine.loadRules()` 每次校验都读 yaml,几毫秒换来改完即生效。
 - **写 ServiceNow 用 `sysparm_input_display_value=true`**:reference 字段(cmdb_ci、assignment_group)直接传显示名,不用先查 sys_id。
-- **配置分层**:`application.yml` 是内部默认值,`spring.config.import` 引入 `./cr-agent.yml` 覆盖;命令行参数再覆盖(smoke test 用这个保证永远 mock)。
+- **配置分层**:`application.yml` 是内部默认值 → `./cr-agent.yml`(工作区)→ `%USERPROFILE%\.cr-agent\cr-agent.yml` 或 `CR_AGENT_CONFIG` 指的文件(工作区外)→ 环境变量 → 命令行参数,后者覆盖前者。smoke test 用命令行参数保证永远 mock。
 
 ## 5. 配置
 
 | 文件 | 谁改 | 内容 |
 |---|---|---|
 | `knowledge/inventory.xlsx` | **你** | 服务器清单:服务 / 环境 / 服务器,可选 IP、OS、负责组、窗口 |
-| `cr-agent.yml` | **你** | Excel 路径和表头映射、实例、账号、代理。不进 git |
+| `cr-agent.yml` | **你** | Excel 路径和表头映射、实例、账号名、代理。不进 git |
+| `%USERPROFILE%\.cr-agent\cr-agent.yml`(或 `CR_AGENT_CONFIG` 指的文件) | **你** | 工作区外的配置,同格式,放密码。覆盖工作区文件 |
+| 环境变量 `SERVICENOW_PASSWORD` / `SERVICENOW_TOKEN` | **你** | 密码的另一种放法。覆盖所有文件 |
 | `cr-agent.example.yml` | 参考 | 上面文件的完整注释版 |
 | `.vscode/mcp.json` | 基本不用改 | 只写"用 java 跑 target/cr-agent.jar,工作目录是项目根" |
 | `application.yml` | 不改 | 内部默认值 |
@@ -212,8 +214,9 @@ scripts/encoding_check.py            验证 stdout 是 UTF-8
 | `inventory.maintenance-window` | Sun 00:00-06:00 | 表里没填窗口的服务器显示这个(真正的检查在 HR-018) |
 | `servicenow.mock` | true | false 走真实例 |
 | `servicenow.instance` | | 实例 URL |
-| `servicenow.user` / `password` | | Basic 认证 |
-| `servicenow.token` | | Bearer token,设了优先 |
+| `servicenow.user` | | Basic 认证的账号名 |
+| `servicenow.password` | | 不写在工作区文件里:外部配置文件或环境变量 `SERVICENOW_PASSWORD` |
+| `servicenow.token` | | Bearer token,设了优先;外部配置文件或环境变量 `SERVICENOW_TOKEN` |
 | `servicenow.ci-table` | cmdb_ci_server | 查服务器的表 |
 | `servicenow.ci-fields.*` | 见 example | CMDB 列名:name, ip-address, os, environment, owner-group, business-app, maintenance-schedule |
 | `servicenow.closed-states` | 3,4,7,-4 | 同步历史时的状态过滤 |
@@ -362,7 +365,7 @@ CHG 号 或 粘贴的草稿
 | CI 查不到就停 | create-cr skill 第 2 步 | 写错服务器 |
 | `add_hard_rule` 先解析再写入,id 查重 | `KnowledgeTools` | 写坏规则文件 |
 | `read_example` 路径限制在 knowledge/ 内 | `KnowledgeTools` | 读任意文件 |
-| 凭据只在 `cr-agent.yml`,不进 git | `.gitignore` | 泄露 |
+| 凭据不在工作区任何文件 | 环境变量或 `%USERPROFILE%\.cr-agent\cr-agent.yml` | Copilot 读到、进 git |
 
 ## 10. 工具清单
 

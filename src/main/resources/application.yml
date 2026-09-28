@@ -4,7 +4,15 @@
 
 spring:
   config:
-    import: optional:file:./cr-agent.yml
+    # Config files, later one wins:
+    #   1. ./cr-agent.yml                          in the workspace (non-secret settings)
+    #   2. a file OUTSIDE the workspace            %USERPROFILE%\.cr-agent\cr-agent.yml by default,
+    #                                              or any path set in env var CR_AGENT_CONFIG
+    # Credentials can also be plain env vars: SERVICENOW_PASSWORD / SERVICENOW_TOKEN
+    # (Spring binds them to servicenow.password / servicenow.token). Env vars beat both files.
+    import:
+      - optional:file:./cr-agent.yml
+      - optional:file:${CR_AGENT_CONFIG:${user.home}/.cr-agent/cr-agent.yml}
   main:
     banner-mode: off
     web-application-type: none

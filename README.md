@@ -69,7 +69,20 @@ servicenow:
   mock: true
 ```
 
-接公司实例时,把 `cr-agent.example.yml` 的内容复制过来填:
+**密码不放进工作区。** `cr-agent.yml` 在项目目录里,Copilot 能读到工作区内任何文件,`.gitignore` 拦不住它。密码放工作区外面,两种都行:
+
+| 方式 | 怎么做 |
+|---|---|
+| 环境变量 | PowerShell 执行一次 `setx SERVICENOW_PASSWORD "你的密码"`(或 `setx SERVICENOW_TOKEN "..."`) |
+| 工作区外的配置文件 | 建 `C:\Users\<你>\.cr-agent\cr-agent.yml`,内容和工作区的 `cr-agent.yml` 同格式,只写 `servicenow:` 下的 `password:` 或 `token:`。想放别处就设环境变量 `CR_AGENT_CONFIG` 指向那个文件 |
+
+两种都设了之后**重启 VS Code**(环境变量是进程启动时继承的)。
+
+优先级从低到高:工作区 `cr-agent.yml` → 工作区外的文件 → 环境变量。同一项后者覆盖前者,所以可以把不敏感的放工作区、敏感的放外面。
+
+Java 程序本身不会把配置回传给 Copilot,密码只用于对 ServiceNow 的 HTTPS 认证,不写日志。
+
+接公司实例时,把 `cr-agent.example.yml` 的内容复制过来填(密码除外):
 
 ```yaml
 inventory:
@@ -84,7 +97,7 @@ servicenow:
   mock: false
   instance: https://company.service-now.com
   user: svc_cr_agent
-  password: "..."                       # 或者填 token
+  # password / token 不写这里, 放环境变量或工作区外的配置文件 (见上表)
   # proxy-host: proxy.company.com       # 走代理时打开
   # proxy-port: 8080
 ```
@@ -141,6 +154,7 @@ python scripts/smoke_test.py     # 2. 自检,应打印 ALL OK(可跳过)
 |---|---|
 | Copilot 里没有 cr-agent 工具 | 先 `mvn package`;再在 `.vscode/mcp.json` 点 Start;看 `logs/cr-agent.log` |
 | 启动即退出 | 看 `logs/cr-agent.log` 最后的异常,常见是 `mock: false` 但没填 `instance` |
+| 连 ServiceNow 返回 401 | 密码没被读到:环境变量没设、外部配置文件路径不对、或 VS Code 没重启。新开 PowerShell 用 `echo $env:SERVICENOW_PASSWORD` 检查;`logs/cr-agent.log` 开头不会打印密码,但会列出加载了哪些配置文件 |
 | 中文乱码 | 跑 `python scripts/encoding_check.py`,应显示 utf-8 True |
 | 启动报 "has no column 'xxx'" | Excel 表头和 `cr-agent.yml` 的 `inventory.columns` 对不上,错误里列出了实际找到的表头 |
 | `lookup_ci` / `lookup_service` 返回空 | 名字拼错或 Excel 里没有;`lookup_service` 不传参数会列出所有服务名 |

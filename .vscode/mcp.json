@@ -1,0 +1,15 @@
+{
+  "servers": {
+    "cr-agent": {
+      "type": "stdio",
+      "cwd": "${workspaceFolder}",
+      "command": "java",
+      "args": [
+        "-Dfile.encoding=UTF-8",
+        "-Dstdout.encoding=UTF-8",
+        "-jar",
+        "target/cr-agent.jar"
+      ]
+    }
+  }
+}

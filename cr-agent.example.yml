@@ -27,8 +27,12 @@ servicenow:
   # ---- 接公司实例时填下面这些 ----
   instance: https://company.service-now.com
   user: svc_cr_agent
-  password: ""            # 二选一: 填 password, 或者填 token
-  token: ""
+  # !! 密码/token 不要写在这个文件里: 它在工作区内, Copilot 能读到工作区里的任何文件。
+  # 放工作区外面, 二选一 (设完重启 VS Code):
+  #   1. 环境变量:  setx SERVICENOW_PASSWORD "你的密码"   或   setx SERVICENOW_TOKEN "..."
+  #   2. 外部文件:  %USERPROFILE%\.cr-agent\cr-agent.yml (同格式, 只写 servicenow.password 或 token);
+  #                想放别的路径就设环境变量 CR_AGENT_CONFIG 指过去
+  # 优先级: 这个文件 < 外部文件 < 环境变量
 
   # ---- 下面两项只在 inventory.file 留空、改查 CMDB 时才用 ----
   ci-table: cmdb_ci_server
