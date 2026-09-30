@@ -6,3 +6,7 @@ history.db
 *.iml
 .env
 cr-agent.yml
+out/
+libs/
+demo/demo.log
+demo/demo.db

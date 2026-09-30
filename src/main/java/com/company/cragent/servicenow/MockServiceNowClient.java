@@ -191,6 +191,16 @@ public class MockServiceNowClient implements ServiceNowGateway {
         return r.fields();
     }
 
+    @Override
+    public List<Map<String, String>> rawGet(String table, String encodedQuery, int limit, String fields) {
+        if ("change_request".equals(table)) {
+            List<Map<String, String>> out = new ArrayList<>();
+            for (ChangeRecord r : queryChanges(encodedQuery == null ? "" : encodedQuery, limit, false)) out.add(r.fields());
+            return out;
+        }
+        return List.of(Map.of("_mock", "table '" + table + "' is not simulated; only change_request is"));
+    }
+
     // ---------------------------------------------------------- seed helpers
 
     private void seed(String number, String approval, String closeCode, String title, String desc,

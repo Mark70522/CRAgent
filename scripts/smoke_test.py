@@ -27,7 +27,10 @@ for stale in ("smoke-history.db",):
 
 # Command-line properties override cr-agent.yml, so the smoke test always runs in mock mode
 # against throw-away files whatever the developer has configured.
-ARGS = ["java", "-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-jar", JAR,
+OFFLINE = "--offline" in sys.argv   # test the javac/libs build (run-offline.bat) instead of the Maven jar
+LAUNCH = (["cmd", "/c", os.path.join(ROOT, "run-offline.bat")] if OFFLINE
+          else ["java", "-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-jar", JAR])
+ARGS = LAUNCH + [
         "--servicenow.mock=true",
         "--cr.knowledge-dir=" + KNOWLEDGE,
         "--inventory.file=" + os.path.join(KNOWLEDGE, "inventory.xlsx"),

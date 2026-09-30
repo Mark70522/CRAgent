@@ -108,12 +108,94 @@ servicenow:
 
 ---
 
+## 2.3 公司接口和标准的不一样怎么办
+
+Java 里不写死任何表名、列名、路径,分两种情况:
+
+**情况 A:接口形状一样,只是名字不一样**(最常见:加了 `u_` 字段、审批走自定义表、外面包了网关)。全部在 `cr-agent.yml` 的 `servicenow.api` 下改,不碰代码:
+
+| 不一样的地方 | 改哪 |
+|---|---|
+| 路径不是 `/api/now/table` | `api.base-path` |
+| 网关要额外的 header / 参数 | `api.headers` / `api.default-params` |
+| 返回 JSON 的结构不一样 | `api.result-path` / `api.record-path`(多层用点分隔) |
+| 表名不一样 | `api.tables.*` |
+| CR / task 的列名不一样 | `api.change-fields` / `api.task-fields`,左边逻辑名右边真实名,只写不一样的。程序读写时双向翻译,规则和模板永远用逻辑名 |
+| 审批记录在别的表、列名不同 | `api.approval.*`,查询里 `{since}` `{sys_id}` 会被替换 |
+| 工作备注不在 `sys_journal_field` | `api.journal.*` |
+
+到公司后的做法:先在 Copilot 里说"用 sn_raw_get 查 change_request 表 number=CHG0012345",看真实返回的列名;再说"用 sn_raw_get 查 sysapproval_approver 表 state=rejected 取 3 条",看审批长什么样;对着填 yml;用 `sn_config` 确认配置生效。整个过程只读。
+
+不想开 Copilot 也能查,命令行直接调任何一个工具:
+
+```bash
+java -cp "libs/*" scripts/CallTool.java sn_config
+java -cp "libs/*" scripts/CallTool.java sn_raw_get "{\"table\":\"change_request\",\"query\":\"number=CHG0012345\"}"
+java -cp "libs/*" scripts/CallTool.java get_change "{\"number\":\"CHG0012345\"}"
+```
+
+离线编译的加环境变量 `CR_AGENT_LAUNCH=offline`。
+
+**情况 B:接口形状完全不同**(不是 REST Table API,或者要走公司自己的变更服务)。写一个新类实现 `ServiceNowGateway` 接口(9 个方法,见 `servicenow/ServiceNowGateway.java`),加上:
+
+```java
+@Component
+@ConditionalOnExpression("'${servicenow.mock:true}' == 'false' && '${servicenow.adapter:}' == 'acme-gateway'")
+public class AcmeGatewayClient implements ServiceNowGateway { ... }
+```
+
+然后 `cr-agent.yml` 里 `servicenow.adapter: acme-gateway`。工具、规则、模板、Excel、历史库全部不用动,它们只认接口。
+
+## 2.4 在 IntelliJ 里用
+
+GitHub Copilot 的 JetBrains 插件同样有 Agent 模式和 MCP,server 不用改。两处不同:
+
+1. **MCP 配置**:Copilot Chat 切到 Agent 模式,点工具图标 → Configure MCP(或 Settings → GitHub Copilot → MCP),
+   打开的是全局 `mcp.json`(Windows 一般在 `%LOCALAPPDATA%\github-copilot\intellij\mcp.json`)。不支持 `${workspaceFolder}`,写绝对路径:
+
+```json
+{
+  "servers": {
+    "cr-agent": {
+      "type": "stdio",
+      "command": "C:\\path\\to\\cr-agent\\run.bat",
+      "args": []
+    }
+  }
+}
+```
+
+   `run.bat` 会先切到项目目录再启动,所以 `cr-agent.yml`、`knowledge/` 都能找到。离线编译的换成 `run-offline.bat`。
+
+2. **Skills**:`.github/skills/*/SKILL.md` 在 JetBrains 插件里是否自动识别,取决于插件版本。识别不了的话有两个办法:
+   在对话里用 `#file` 把对应的 `SKILL.md` 附上再提要求;或者把 `create-cr/SKILL.md` 的内容并进
+   `.github/copilot-instructions.md`(JetBrains 支持这个文件)。工具调用不受影响,只是流程说明要让它看得到。
+
+## 2.5 公司里下不了包怎么办
+
+运行不需要下包:`target/cr-agent.jar` 是 fat jar,拷过去只要有 JDK 17 就能跑。
+
+在公司要改代码、又没有 Maven 私服时,用离线编译:
+
+1. 在能上网的机器上 `mvn dependency:copy-dependencies -DoutputDirectory=libs`(本仓库已经导好,`libs/` 82 个 jar,58MB),把整个项目目录连 `libs/` 一起拷到公司机器。
+2. 公司机器上双击 `build-offline.bat`:只用 JDK 自带的 `javac` 和 `jar`,不需要 Maven、不需要网络,产物在 `out/`。
+3. `.vscode/mcp.json` 的 `command` 改成 `run-offline.bat`,`args` 留空即可:
+
+```json
+"command": "${workspaceFolder}/run-offline.bat",
+"args": []
+```
+
+有 Maven 私服的话不用这些,`~/.m2/settings.xml` 配个 mirror,照常 `mvn package`。
+
 ## 3. 启动:三步
 
 ```bash
-mvn -q -DskipTests package       # 1. 构建,产出 target/cr-agent.jar
-python scripts/smoke_test.py     # 2. 自检,应打印 ALL OK(可跳过)
+mvn -q -DskipTests package                    # 1. 构建,产出 target/cr-agent.jar
+java -cp "libs/*" scripts/SmokeTest.java      # 2. 自检,应打印 ALL OK(可跳过;只要 JDK,不要 Python)
 ```
+
+离线编译的用 `java -cp "libs/*" scripts/SmokeTest.java --offline`。`scripts/*.py` 是同样的测试的 Python 版,没有 Python 环境就不用管。
 
 3. 用 VS Code 打开 `cr-agent` 目录,Copilot Chat 切到 **Agent** 模式。`.vscode/mcp.json` 已经配好,工具列表里应出现 `lookup_ci`、`build_draft` 等。没出现就打开 `.vscode/mcp.json`,点上方的 Start。
 
@@ -131,7 +213,7 @@ python scripts/smoke_test.py     # 2. 自检,应打印 ALL OK(可跳过)
 
 示例 Excel 里有 2 个服务 9 台服务器,mock 的 ServiceNow 里有 3 个过审 CR、1 个被打回的 CR(CHG0030004)。
 
-前置:JDK 17+、Maven 3.9+、VS Code + GitHub Copilot(支持 Agent 模式)。Python 只给 smoke test 用。
+前置:JDK 17+、VS Code + GitHub Copilot(支持 Agent 模式)。Maven 只在有网的机器上构建时需要,公司里可以用离线编译(见 2.5)。不需要 Python。
 
 ---
 
@@ -165,7 +247,39 @@ python scripts/smoke_test.py     # 2. 自检,应打印 ALL OK(可跳过)
 
 ---
 
-## 6. 更多
+## 6. 日课驾驶舱:任务、早晚仪式、知识沉淀
+
+同一个 server 里的第二个功能,和 CR 那套共用 Copilot 和配置。任务不接 Jira,你贴给 Copilot 它整理。
+
+**一天怎么用**
+
+| 你说 | 发生什么 |
+|---|---|
+| `早安` | 读昨天没做完的、所有未完成任务、相关知识,给你今天的三件事(每件带"为什么",出处是你自己的记录),排时间轴,确认后写进今天的计划 |
+| 贴一段邮件/会议记录,说 `记成任务` | 拆成任务存进 backlog,和已有的自动合并,回你一个清单 |
+| `记一笔:坑 opatch 之后要重启监听` | 落到今天的随手记,开头的「决定 / 坑 / 学到」自动分类 |
+| `上次 srv-db-01 回退花了多久` | 只从你的知识文件和任务笔记里找,答案带文件名 |
+| `收工` | 统计完成和投入,把带分类的随手记提出来让你逐条确认是否入库,给明天的草稿,关闭今天 |
+| `九月我做了什么` / `补丁相关的任务都翻出来` | `task_history`:按时间排的历史,每条带来源原文、过程记录、沉淀出的知识、预估和实际耗时、拖了几天;关键字能搜到标题、原文、笔记和知识 |
+
+对应三个 skill:`morning-brief`、`capture`、`evening-close`。页面里的「任务历史」是同一个查询:按创建 / 完成 / 更新时间排,按状态筛,关键字实时搜,点开一条看全部信息。
+
+**页面**:server 启动后打开 http://127.0.0.1:7777/ (端口在 `cr-agent.yml` 的 `cockpit.port`)。左边最下面的「变更单」视图输入 CHG 号能直接从 ServiceNow 读一张 CR:字段、六段计划文本、task 时间表、审批记录、工作备注,加上硬规则校验结果和同一台机器的过审 CR。页面和 Copilot 读写同一批文件,勾任务、记一笔、点「沉淀」、收尾都可以在页面上做;简报和"值得留下的"文字由 Copilot 写,页面只展示。
+
+**数据全是文件**,在 `cockpit/`:
+
+```
+cockpit/
+├── backlog.json            所有任务
+├── days/2026-09-30.json    当天:简报、计划、时间轴、随手记、总结
+├── task-notes/T-0001.md    每个任务自己的笔记(贴进来的原文、后续)
+├── knowledge/<主题>.md      你确认留下的,每条带日期和来源任务
+└── stats.json              每个收尾过的日子一行
+```
+
+想改就直接改文件;想备份就把目录进 git。
+
+## 7. 更多
 
 - 详细设计(架构、每个流程、规则格式、工具清单、扩展点):[DESIGN.md](DESIGN.md)
 - 规则文件格式和模板格式:直接看 `knowledge/rules/hard-rules.yaml` 和 `knowledge/templates/os-patch.yaml` 里的注释

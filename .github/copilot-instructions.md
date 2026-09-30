@@ -4,6 +4,10 @@ This workspace is an agent for creating and reviewing ServiceNow change requests
 `cr-agent` exposes the tools; the skills under `.github/skills/` define the workflows; `knowledge/` holds
 the rules, templates and examples that encode what our approvers expect.
 
+The same server also runs the daily task cockpit (skills `morning-brief`, `capture`, `evening-close`;
+tools `add_tasks`, `get_day`, `plan_day`, `capture_note`, `close_day`, `save_knowledge`, `search_knowledge`).
+Answers about the user's past come only from `search_knowledge` / `task_notes`, with the file named.
+
 Ground rules, always:
 
 - Never call `create_change` with `confirmed=true` until the user has seen the complete final draft and

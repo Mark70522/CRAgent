@@ -38,6 +38,12 @@ logging:
 cr:
   knowledge-dir: ./knowledge
 
+# Daily task cockpit: files under cockpit/, page on http://127.0.0.1:7777/
+cockpit:
+  dir: ./cockpit
+  port: 7777
+  web: true
+
 # Server inventory. Blank file = use the ServiceNow CMDB instead.
 inventory:
   file: ./knowledge/inventory.xlsx

@@ -1,0 +1,32 @@
+{
+  "date" : "2026-09-29",
+  "brief" : "三件事:补丁 CR 定稿(已经拖了一天),srv-db-01 的回退演练,回 DBA 的邮件。CR 的 backout 段要写耗时,这是上两次被打回的原因。",
+  "plan" : [ "T-0001", "T-0002", "T-0003" ],
+  "timeline" : [
+    { "time" : "09:15", "label" : "补丁 CR 定稿", "minutes" : 90, "taskId" : "T-0001" },
+    { "time" : "11:00", "label" : "回退演练", "minutes" : 60, "taskId" : "T-0002" },
+    { "time" : "16:30", "label" : "回 DBA 邮件", "minutes" : 15, "taskId" : "T-0003" }
+  ],
+  "notes" : [ {
+    "t" : "09:20",
+    "kind" : "decision",
+    "text" : "周日窗口的 CR 一律留满 5 小时,不按任务时长凑。",
+    "taskId" : "T-0001",
+    "saved" : true
+  }, {
+    "t" : "10:05",
+    "kind" : "pitfall",
+    "text" : "srv-app-02 要等 01 验证完再开始,不能并行。os-patch 模板里的 task 序列是并行的,要改。",
+    "taskId" : "T-0001",
+    "saved" : true
+  }, {
+    "t" : "16:10",
+    "text" : "DBA 值班人是 Ken,周五下午不在。",
+    "taskId" : "T-0003",
+    "saved" : false
+  } ],
+  "summary" : "CR 还差 backout 一段;演练被临时会议挤掉了;邮件又拖了一天。完成 0/3,但补丁顺序这个坑值得记。",
+  "tomorrow" : [ "T-0001", "T-0002", "T-0003" ],
+  "closed" : true,
+  "closedAt" : "2026-09-29 18:15"
+}

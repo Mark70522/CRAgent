@@ -426,7 +426,53 @@ CHG 号 或 粘贴的草稿
 | 相似检索升级向量检索 | `HistoryStore.findSimilar` 换实现,接口不变 |
 | Copilot Studio 也用 | MCP server 不变,skills 流程搬到 topic |
 
-## 13. 已知限制
+## 13. 第二个功能:日课驾驶舱
+
+同一个 server、同一套 Copilot 接入,第二条数据流。设计原则和 CR 那套一样:Copilot 负责理解和写字,
+Java 负责存、算、把关,所有数据是普通文件。
+
+```
+你说"早安 / 记成任务 / 记一笔 / 收工"
+        │
+   Skills:morning-brief · capture · evening-close(.github/skills/)
+        │  调工具
+   CockpitTools(12 个 @Tool)──► CockpitStore ──► cockpit/ 目录
+        │                                          ├── backlog.json          所有任务
+   页面 127.0.0.1:7777                              ├── days/日期.json        简报、计划、时间轴、随手记、总结
+   (CockpitWebServer,JDK HttpServer)               ├── task-notes/T-xxxx.md 原文和过程
+   读写同一批文件                                    ├── knowledge/主题.md    确认留下的,带日期和来源任务
+                                                    └── stats.json           每个收尾过的日子一行
+```
+
+**任务来源只有一种**:你贴给 Copilot 的文本(邮件、会议记录、聊天、一句话)。`add_tasks` 按标题相似度
+(拉丁词 + 中文二元组的 Jaccard ≥ 0.6,或互相包含)和未完成任务查重,重复的合并、原文补进笔记。不接 Jira。
+
+**三条流程**
+
+| skill | 触发 | 读 | 想(Copilot) | 写 |
+|---|---|---|---|---|
+| morning-brief | 早安 | `get_day`:昨天的总结和 tomorrow、带过来的任务、未完成任务、近 7 天统计、知识主题;需要时 `task_notes` / `search_knowledge` | 最多三件事,每件一句"为什么",理由必须来自记录;估今天够不够时间;排时间轴 | 你确认后 `plan_day`(计划、简报文字、时间轴),放弃的 `update_task` |
+| capture | 记成任务 / 记一笔 / 上次…怎么做的 | 贴的文本;`search_knowledge`、`task_notes` | 拆条目、定优先级、认分类(决定/坑/学到) | `add_tasks` / `capture_note`;回答只引用文件里有的 |
+| evening-close | 收工 | `get_day` | 一句话总结;挑值得留的,提议主题、标题、内容;明天前三件 | 你逐条确认后 `save_knowledge`(标记该随手记已入库);`close_day` 写总结、明天、统计 |
+
+**历史**:`task_history` 把一个任务的全部记录拼起来:排过哪几天、挂在它上的随手记(带日期时间和分类)、
+它沉淀出的知识条目(从 knowledge 文件里的「来源:任务 T-xxxx」反查)、它自己的笔记文件、预估和实际、拖了几天。
+按创建 / 完成 / 更新时间排,同一分钟按编号;关键字搜标题、原文、标签、笔记、知识。页面「任务历史」和它是同一个查询。
+
+**页面能做和不能做的**
+
+| 能 | 不能(是 Copilot 的活) |
+|---|---|
+| 勾任务、记一笔、点「沉淀」选主题、写一句总结收尾、搜历史和知识 | 写晨间简报、选三件事、排时间轴、提炼"值得留下的"文字、明天草稿 |
+
+没有 Copilot 也能当一个纯手动的任务本用,只是没人替你想。
+
+**安全闸**:没有确认不写计划、不入库;页面只监听 127.0.0.1;不接外部系统。
+
+**两个功能怎么互相喂**:收尾时关于变更流程的坑(如 srv-app 双机顺序),skill 会提示改 CR 模板或加规则;
+建 CR 这件事本身是一个任务,编号、耗时、打回原因都进任务历史。
+
+## 14. 已知限制
 
 - **窗口规则是全局的提醒**。HR-018 对所有 CR 按周日 00:00-06:00 给 warn;Excel 里单独填了窗口的服务器(比如 dev 机)只会在 `get_change_windows` 里显示出来,规则不会按行区分。需要的话可以给 HR-018 加 `when` 条件或按环境拆成多条。
 - **Excel 服务器名必须和 ServiceNow 里的 CI 名一致**,创建 CR 时 `cmdb_ci` 按名字写入。

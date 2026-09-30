@@ -1,0 +1,7 @@
+{
+  "days" : [
+    { "date" : "2026-09-25", "planned" : 1, "done" : 1, "estDoneMinutes" : 60, "spentMinutes" : 90, "notes" : 1, "knowledgeSaved" : 1 },
+    { "date" : "2026-09-26", "planned" : 1, "done" : 0, "estDoneMinutes" : 0, "spentMinutes" : 0, "notes" : 1, "knowledgeSaved" : 1 },
+    { "date" : "2026-09-29", "planned" : 3, "done" : 0, "estDoneMinutes" : 0, "spentMinutes" : 0, "notes" : 3, "knowledgeSaved" : 2 }
+  ]
+}

@@ -30,5 +30,11 @@ public interface ServiceNowGateway {
 
     Map<String, String> updateChange(String number, Map<String, String> fields);
 
+    /**
+     * Raw read of any table, for discovering what your instance really returns
+     * (column names, values) before writing the mappings in cr-agent.yml.
+     */
+    List<Map<String, String>> rawGet(String table, String encodedQuery, int limit, String fields);
+
     String instanceUrl();
 }

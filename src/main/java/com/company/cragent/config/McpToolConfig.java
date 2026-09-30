@@ -2,6 +2,8 @@ package com.company.cragent.config;
 
 import com.company.cragent.tools.ChangeTools;
 import com.company.cragent.tools.CmdbTools;
+import com.company.cragent.tools.CockpitTools;
+import com.company.cragent.tools.DiagnosticsTools;
 import com.company.cragent.tools.HistoryTools;
 import com.company.cragent.tools.KnowledgeTools;
 import com.company.cragent.tools.TemplateTools;
@@ -21,9 +23,11 @@ public class McpToolConfig {
                                         TemplateTools template,
                                         ValidationTools validation,
                                         HistoryTools history,
-                                        KnowledgeTools knowledge) {
+                                        KnowledgeTools knowledge,
+                                        DiagnosticsTools diagnostics,
+                                        CockpitTools cockpit) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(cmdb, change, template, validation, history, knowledge)
+                .toolObjects(cmdb, change, template, validation, history, knowledge, diagnostics, cockpit)
                 .build();
     }
 }

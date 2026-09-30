@@ -1,6 +1,5 @@
 package com.company.cragent.inventory;
 
-import com.company.cragent.config.InventoryProperties;
 import com.company.cragent.model.CiInfo;
 import com.company.cragent.model.MaintenanceWindow;
 import com.company.cragent.servicenow.ServiceNowGateway;
@@ -16,7 +15,7 @@ public class ServiceNowCiDirectory implements CiDirectory {
 
     private final ServiceNowGateway sn;
 
-    public ServiceNowCiDirectory(ServiceNowGateway sn, InventoryProperties unused) {
+    public ServiceNowCiDirectory(ServiceNowGateway sn) {
         this.sn = sn;
     }
 

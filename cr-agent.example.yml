@@ -5,6 +5,12 @@
 #  本机测试: 保持 mock: true, 其他都不用填。
 # ============================================================================
 
+# ---- 日课驾驶舱 (任务 + 早晚仪式 + 知识沉淀), 数据全在 cockpit/ 目录 ----
+cockpit:
+  dir: ./cockpit
+  port: 7777            # 页面地址 http://127.0.0.1:7777/
+  web: true             # false = 不起页面, 只留 Copilot 工具
+
 # ---- 服务器清单: 你们的 Excel ----
 inventory:
   file: ./knowledge/inventory.xlsx      # 也支持 .csv; 留空则改查 ServiceNow CMDB
@@ -47,6 +53,43 @@ servicenow:
 
   # 同步历史时只拉这些状态的 CR (标准 ITSM: 3=Closed 4=Canceled 7=Closed 其他 -4=Canceled)
   closed-states: "3,4,7,-4"
+
+  # ---- 公司接口和标准 Table API 不一样时改这里 (全部可选, 不写 = 标准值) ----
+  # 先在 Copilot 里用 sn_raw_get 看真实返回, 再对着填; sn_config 能看当前生效的配置。
+  # adapter: table-api          # 接口形状完全不同时, 写一个新的 ServiceNowGateway 实现并在这里选它 (见 README)
+  api:
+    base-path: /api/now/table   # 公司包了网关的话改成网关路径, 如 /api/x_acme/itsm/v1
+    result-path: result         # 返回 JSON 里记录数组所在的键, 多层用点: data.items
+    record-path: result         # POST/PATCH 返回的那条记录所在的键
+    # headers:                  # 每个请求都带的额外头, 比如网关的 API key
+    #   X-Api-Key: "..."
+    # default-params:           # 每个请求都带的额外参数
+    #   sysparm_display_value: "true"
+    tables:
+      change: change_request
+      task: change_task
+      approval: sysapproval_approver
+      journal: sys_journal_field
+    # 列名映射: 左边是程序 / 规则 / 模板用的逻辑名, 右边是你们实例的真实列名。只写不一样的。
+    change-fields:
+      # backout_plan: u_rollback_plan
+      # justification: u_business_justification
+    task-fields:
+      # planned_start_date: u_planned_start
+    task-link-field: change_request   # task 表上指向 CR 的列
+    task-order-field: order
+    approval:
+      # {since} 和 {sys_id} 会被替换
+      rejected-query: "state=rejected^source_table=change_request^sys_updated_on>={since}^ORDERBYDESCsys_updated_on"
+      by-change-query: "sysapproval={sys_id}^ORDERBYsys_updated_on"
+      link-field: sysapproval
+      fields: [sysapproval, approver, state, comments, sys_updated_on]
+      # field-map:              # 真实列名 -> 程序期望的名字 (approver / state / comments / sys_updated_on)
+      #   u_reviewer: approver
+      #   u_remarks: comments
+    journal:
+      by-change-query: "element_id={sys_id}^ORDERBYsys_created_on"
+      fields: [element, value, sys_created_on, sys_created_by]
 
   # 走代理时打开
   # proxy-host: proxy.company.com

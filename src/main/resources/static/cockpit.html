@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>日课驾驶舱</title>
+<style>
+:root{
+  --bg:#F3F5F8; --surface:#FFFFFF; --surface-2:#EAEEF3; --line:#DDE2EA; --line-strong:#C6CDD8;
+  --ink:#171B24; --ink-2:#4B5261; --ink-3:#7A8292; --ink-4:#A4ABB8;
+  --accent:#2A6F97; --accent-ink:#FFFFFF; --accent-soft:#E3EEF6; --accent-soft-ink:#1E5678;
+  --good:#2E8B57; --good-soft:#E3F3EA; --warn:#C47A12; --warn-soft:#FBF0DC; --bad:#C24545; --bad-soft:#F9E3E3;
+  --ai:#5B4BB7; --ai-soft:#ECE8F8; --ai-ink:#3F3392;
+  --r:14px; --r-sm:9px;
+  --sans:"IBM Plex Sans","Noto Sans SC",-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --serif:"Noto Serif SC","Songti SC","SimSun",serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#11141B; --surface:#191D26; --surface-2:#222732; --line:#2B313D; --line-strong:#3A4250;
+  --ink:#E9ECF2; --ink-2:#B4BAC7; --ink-3:#848CA0; --ink-4:#5E6678;
+  --accent:#6FB1DB; --accent-ink:#0E1A24; --accent-soft:#1B2E3D; --accent-soft-ink:#9FD0F0;
+  --good:#5CC48A; --good-soft:#173125; --warn:#E5A44A; --warn-soft:#3A2A11; --bad:#E06B6B; --bad-soft:#3D1D1D;
+  --ai:#A69BF0; --ai-soft:#262244; --ai-ink:#CFC8FF;
+}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input,select{font:inherit;color:inherit}
+h1,h2,h3{margin:0}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+[hidden]{display:none!important}
+
+.app{display:grid;grid-template-columns:200px minmax(0,1fr) 300px;min-height:100%}
+.rail{padding:22px 14px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:22px;background:var(--surface)}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px}
+.brand-mark{width:30px;height:30px;border-radius:8px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-family:var(--serif);font-weight:700;font-size:16px}
+.brand-name{font-weight:600;font-size:15px}
+.brand-sub{font-size:11px;color:var(--ink-3);letter-spacing:.04em}
+.nav{display:flex;flex-direction:column;gap:4px}
+.nav-lbl{font-size:11px;color:var(--ink-4);letter-spacing:.08em;text-transform:uppercase;padding:0 10px;margin-bottom:4px}
+.nav button{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r-sm);color:var(--ink-2);text-align:left;width:100%}
+.nav button:hover{background:var(--surface-2)}
+.nav button[aria-current="page"]{background:var(--accent-soft);color:var(--accent-soft-ink);font-weight:600}
+.nav .t{font-family:var(--mono);font-size:11px;color:var(--ink-4);width:38px;flex-shrink:0}
+.nav button[aria-current="page"] .t{color:var(--accent-soft-ink)}
+.rail-foot{margin-top:auto;font-size:12px;color:var(--ink-3);padding:0 8px;line-height:1.6}
+.rail-foot b{color:var(--ink-2);font-weight:600}
+
+.main{padding:26px 28px;display:flex;flex-direction:column;gap:20px;min-width:0}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.head h1{font-family:var(--serif);font-weight:700;font-size:26px}
+.head .date{font-size:13px;color:var(--ink-3);margin-top:4px}
+.head .date b{color:var(--ink-2);font-weight:500}
+.pills{display:flex;gap:8px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:12px;color:var(--ink-2)}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-4)}
+.pill.good .dot{background:var(--good)} .pill.warn .dot{background:var(--warn)} .pill.bad .dot{background:var(--bad)}
+
+.view{display:flex;flex-direction:column;gap:18px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px}
+.card-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px}
+.card-h h2{font-size:15px;font-weight:600}
+.card-h .meta{font-size:12px;color:var(--ink-3)}
+.sec-lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
+.empty{padding:18px;border:1px dashed var(--line);border-radius:var(--r-sm);color:var(--ink-3);font-size:13px;text-align:center}
+.empty code{font-family:var(--mono);background:var(--surface-2);padding:1px 6px;border-radius:4px;color:var(--ink-2)}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px}
+.stat{padding:14px 16px;border-radius:var(--r-sm);background:var(--surface-2)}
+.stat .v{font-family:var(--mono);font-size:26px;font-weight:500;line-height:1.1}
+.stat .v small{font-size:14px;color:var(--ink-3)}
+.stat .k{font-size:12px;color:var(--ink-3);margin-top:4px}
+.stat.acc{background:var(--accent-soft);color:var(--accent-soft-ink)} .stat.acc .k{color:var(--accent-soft-ink);opacity:.8}
+
+.tasks{display:flex;flex-direction:column;gap:8px}
+.task{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;align-items:start;padding:12px 14px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--surface)}
+.task.done{opacity:.55} .task.done .title{text-decoration:line-through}
+.chk{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line-strong);display:grid;place-items:center;margin-top:1px;background:var(--surface);color:#fff}
+.task.done .chk{background:var(--good);border-color:var(--good)}
+.chk svg{width:12px;height:12px;display:none} .task.done .chk svg{display:block}
+.title{font-weight:500;text-align:left}
+.sub{font-size:12px;color:var(--ink-3);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap}
+.tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500;background:var(--surface-2);color:var(--ink-2);white-space:nowrap}
+.tag.P1{background:var(--bad-soft);color:var(--bad)} .tag.P2{background:var(--warn-soft);color:var(--warn)} .tag.P3{background:var(--accent-soft);color:var(--accent-soft-ink)}
+.task .more{grid-column:2/4;display:none;margin-top:8px;padding-top:10px;border-top:1px dashed var(--line);font-size:13px;color:var(--ink-2)}
+.task.open .more{display:block}
+.kn{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;font-size:12.5px;margin:0}
+.kn dt{color:var(--ink-3);white-space:nowrap} .kn dd{margin:0}
+
+.ai{border:1px solid var(--line);border-left:3px solid var(--ai);background:var(--surface);border-radius:var(--r);padding:16px 18px}
+.ai-h{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ai-ink);font-weight:600;letter-spacing:.04em;margin-bottom:10px}
+.ai-h .sp{width:8px;height:8px;border-radius:50%;background:var(--ai)}
+.ai p{margin:0 0 8px;white-space:pre-wrap}
+.ai .why{color:var(--ink-3);font-size:12.5px}
+
+.tl{display:flex;flex-direction:column}
+.tl-row{display:grid;grid-template-columns:52px 12px minmax(0,1fr);gap:0 10px}
+.tl-t{font-family:var(--mono);font-size:12px;color:var(--ink-3);padding-top:10px;text-align:right}
+.tl-l{position:relative} .tl-l::before{content:"";position:absolute;left:5px;top:0;bottom:0;width:2px;background:var(--line)}
+.tl-l::after{content:"";position:absolute;left:1px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+.tl-b{margin:6px 0;padding:8px 12px;border-radius:var(--r-sm);background:var(--surface-2);font-size:13px}
+.tl-b b{font-weight:600} .tl-b .m{color:var(--ink-3);font-size:12px}
+
+.cap{display:flex;gap:8px}
+.cap input{flex:1;padding:10px 12px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--surface-2)}
+.btn{padding:9px 14px;border-radius:var(--r-sm);background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:13px;white-space:nowrap}
+.btn:disabled{opacity:.6;cursor:default}
+.btn.ghost{background:var(--surface-2);color:var(--ink-2)} .btn.ai{background:var(--ai);color:#fff}
+.log{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.log li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;font-size:13px}
+.log .t{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.kind{display:inline-block;font-size:11px;padding:1px 6px;border-radius:4px;margin-right:6px;background:var(--surface-2);color:var(--ink-2)}
+.kind.decision{background:var(--accent-soft);color:var(--accent-soft-ink)} .kind.pitfall{background:var(--warn-soft);color:var(--warn)} .kind.learned{background:var(--good-soft);color:var(--good)}
+.hint{font-size:11.5px;color:var(--ink-4);line-height:1.5}
+
+.review{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.bar{height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--good);border-radius:4px;transition:width .5s ease}
+.digest{display:flex;flex-direction:column;gap:10px}
+.dg{padding:12px 14px;border-radius:var(--r-sm);border:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.dg .k{font-size:11px;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase}
+.dg .row{display:flex;gap:8px;flex-wrap:wrap}
+.dg input{flex:1;min-width:140px;padding:7px 10px;border-radius:7px;border:1px solid var(--line);background:var(--surface-2);font-size:12.5px}
+.dg .btn{font-size:12px;padding:7px 11px}
+.dg.saved{border-color:var(--good);background:var(--good-soft)}
+.sumrow{display:flex;gap:8px;margin-top:12px}
+.sumrow input{flex:1;padding:9px 12px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--surface-2)}
+
+.ksearch{width:100%;padding:11px 14px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--surface)}
+.kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.kc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.kc h3{font-size:14px;font-weight:600}
+.kc p{margin:0;font-size:13px;color:var(--ink-2)}
+.kc .foot{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-3);border-top:1px dashed var(--line);padding-top:8px;margin-top:auto}
+.hits{display:flex;flex-direction:column;gap:8px}
+.hit{padding:10px 12px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--line);font-size:12.5px}
+.hit .f{font-family:var(--mono);font-size:11px;color:var(--accent);margin-bottom:4px}
+.hit pre{margin:0;white-space:pre-wrap;font-family:inherit;color:var(--ink-2)}
+
+/* history */
+.hbar{display:flex;gap:8px;flex-wrap:wrap}
+.hbar .ksearch{flex:1;min-width:220px}
+.hbar select{padding:10px 12px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.hmonth{font-family:var(--mono);font-size:12px;color:var(--ink-3);letter-spacing:.06em;margin:18px 0 8px}
+.hrow{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);margin-bottom:8px}
+.hrow-h{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;cursor:pointer;text-align:left;width:100%}
+.hrow-h:hover{background:var(--surface-2)}
+.hdate{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.htitle{font-weight:500}
+.hmeta{font-size:12px;color:var(--ink-3);display:flex;gap:10px;flex-wrap:wrap;margin-top:2px}
+.hst{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500}
+.hst.done{background:var(--good-soft);color:var(--good)} .hst.todo,.hst.doing{background:var(--warn-soft);color:var(--warn)} .hst.dropped{background:var(--surface-2);color:var(--ink-3)}
+.hbody{display:none;padding:4px 14px 14px;border-top:1px dashed var(--line);font-size:13px}
+.hrow.open .hbody{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px 22px}
+.hsec .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:10px 0 6px}
+.hsec ul{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:5px}
+.hsec li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;color:var(--ink-2)}
+.hsec li .d{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);white-space:nowrap}
+.hsec pre{margin:0;white-space:pre-wrap;font-family:inherit;color:var(--ink-2);font-size:12.5px;line-height:1.5}
+.hsec .kref{color:var(--accent-soft-ink);background:var(--accent-soft);padding:2px 8px;border-radius:6px;font-size:12px;display:inline-block;margin:2px 4px 2px 0}
+.hsec .kref .d{font-family:var(--mono);opacity:.8}
+
+/* change request viewer */
+.cr-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.cr-num{font-family:var(--mono);font-size:13px;color:var(--ink-3)}
+.cr-title{font-size:18px;font-weight:600;margin-top:2px}
+.cr-chips{display:flex;gap:8px;flex-wrap:wrap}
+.cr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px 18px}
+.cr-f .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.cr-f .v{font-size:13.5px;margin-top:2px;word-break:break-word}
+.cr-sec{margin-top:6px}
+.cr-sec h3{font-size:13px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
+.cr-sec pre{margin:0;white-space:pre-wrap;font-family:inherit;font-size:13.5px;line-height:1.6;color:var(--ink);padding:12px 14px;border-radius:var(--r-sm);background:var(--surface-2)}
+.cr-sec pre.empty{color:var(--ink-4);font-style:italic}
+table.cr-t{width:100%;border-collapse:collapse;font-size:13px}
+table.cr-t th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:6px 8px;border-bottom:1px solid var(--line)}
+table.cr-t td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.cr-t td.num{white-space:nowrap}
+.cr-wrap{overflow-x:auto}
+.vio{display:flex;flex-direction:column;gap:6px}
+.vio-row{display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:10px;align-items:start;padding:8px 10px;border-radius:8px;background:var(--surface-2);font-size:12.5px}
+.vio-row .id{font-family:var(--mono);font-size:11.5px;color:var(--ink-3)}
+.vio-row .sev{font-size:11px;padding:1px 7px;border-radius:5px;font-weight:600}
+.vio-row .sev.error{background:var(--bad-soft);color:var(--bad)} .vio-row .sev.warn{background:var(--warn-soft);color:var(--warn)}
+.vio-row .sug{color:var(--ink-3);display:block;margin-top:2px}
+.jr{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.jr li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;list-style:none}
+.jr .d{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);white-space:nowrap}
+.jr .who{color:var(--ink-2);font-weight:500}
+.sim{display:flex;flex-direction:column;gap:6px}
+.sim a{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;padding:8px 10px;border-radius:8px;background:var(--surface-2);font-size:12.5px;color:inherit;text-decoration:none;cursor:pointer}
+.sim a .n{font-family:var(--mono);color:var(--accent)}
+
+.aside{border-left:1px solid var(--line);background:var(--surface);padding:22px 18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.aside h2{font-size:13px;font-weight:600;color:var(--ink-2)}
+.say{padding:10px 12px;border-radius:10px;background:var(--ai-soft);font-size:13px}
+.say b{display:block;font-family:var(--mono);font-size:12px;color:var(--ai-ink);margin-bottom:2px}
+.say span{color:var(--ink-2);font-size:12.5px}
+
+@media (max-width:1080px){.app{grid-template-columns:180px minmax(0,1fr)} .aside{display:none}}
+@media (max-width:720px){
+  .app{grid-template-columns:1fr}
+  .rail{flex-direction:row;align-items:center;border-right:0;border-bottom:1px solid var(--line);padding:12px 16px;gap:12px;overflow:auto}
+  .brand-sub,.rail-foot,.nav-lbl{display:none} .nav{flex-direction:row} .nav button{padding:7px 10px;white-space:nowrap}
+  .main{padding:18px 16px} .head h1{font-size:22px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="一天的四段">
+    <div class="brand"><div class="brand-mark">课</div><div><div class="brand-name">日课驾驶舱</div><div class="brand-sub">DAILY COCKPIT</div></div></div>
+    <div class="nav">
+      <div class="nav-lbl">今天</div>
+      <button data-view="morning" aria-current="page"><span class="t">09:00</span>晨间启动</button>
+      <button data-view="day"><span class="t">日间</span>任务与记录</button>
+      <button data-view="evening"><span class="t">18:00</span>晚间收尾</button>
+      <div class="nav-lbl" style="margin-top:14px">长期</div>
+      <button data-view="history"><span class="t">史</span>任务历史</button>
+      <button data-view="knowledge"><span class="t">库</span>知识沉淀</button>
+      <div class="nav-lbl" style="margin-top:14px">变更</div>
+      <button data-view="change"><span class="t">CR</span>变更单</button>
+    </div>
+    <div class="rail-foot">连续收尾 <b class="num" id="f-streak">0</b> 天<br>知识条目 <b class="num" id="f-know">0</b> 条<br>未完成任务 <b class="num" id="f-open">0</b> 项</div>
+  </nav>
+
+  <main class="main">
+    <div class="head">
+      <div><h1 id="vtitle">早上好,先看看今天</h1><div class="date" id="h-date"></div></div>
+      <div class="pills" id="pills"></div>
+    </div>
+
+    <section class="view" id="v-morning">
+      <div class="ai"><div class="ai-h"><span class="sp"></span>晨间简报 · Copilot 根据你的任务和知识写的</div><div id="brief"></div></div>
+      <div class="grid2">
+        <div class="card"><div class="card-h"><h2>今天的时间轴</h2><span class="meta">晨间启动时排的</span></div><div id="timeline"></div></div>
+        <div class="card">
+          <div class="card-h"><h2>从前几天带过来的</h2><span class="meta">没做完会一直跟着你</span></div>
+          <div id="carry"></div>
+          <div class="sec-lbl" style="margin-top:16px">最近 7 天</div>
+          <div class="stats" id="stats7"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="v-day" hidden>
+      <div class="grid2" style="grid-template-columns:minmax(0,1.4fr) minmax(280px,1fr)">
+        <div class="card">
+          <div class="card-h"><h2>今天的任务</h2><span class="meta" id="plan-meta"></span></div>
+          <div id="plan"></div>
+          <div class="sec-lbl" style="margin-top:18px">其他未完成的</div>
+          <div id="others"></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h2>随手记</h2><span class="meta">晚上会整理</span></div>
+          <form class="cap" id="capform"><input id="capin" placeholder="例:坑 opatch 之后要重启监听" aria-label="记一笔"><button class="btn" type="submit">记下</button></form>
+          <div class="hint" style="margin-top:8px">开头写「决定」「坑」「学到」会自动分类。也可以在 Copilot 里说"记一笔",效果一样。</div>
+          <ul class="log" id="log"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="v-evening" hidden>
+      <div class="review" id="review"></div>
+      <div class="grid2" style="grid-template-columns:minmax(0,1.3fr) minmax(280px,1fr)">
+        <div class="card">
+          <div class="card-h"><h2>今天值得留下的</h2><span class="meta">带分类的随手记,你点一下才入库</span></div>
+          <div class="digest" id="digest"></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h2>收尾</h2><span class="meta">在 Copilot 里说"收工"会写得更全</span></div>
+          <div class="ai"><div class="ai-h"><span class="sp"></span>一句话总结</div><p id="summary"></p></div>
+          <div class="sumrow"><input id="sumin" placeholder="自己写一句也行"><button class="btn ai" id="closebtn">收尾并记入统计</button></div>
+          <div class="sec-lbl" style="margin-top:16px">明天</div>
+          <div id="tomorrow"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="v-history" hidden>
+      <div class="hbar">
+        <input class="ksearch" id="hq" placeholder="搜历史任务:标题、来源原文、笔记、沉淀出的知识 …" aria-label="搜索历史">
+        <select id="hstatus" aria-label="状态"><option value="all">全部状态</option><option value="done">已完成</option><option value="open">未完成</option><option value="dropped">已放弃</option></select>
+        <select id="hsort" aria-label="排序"><option value="created">按创建时间</option><option value="done">按完成时间</option><option value="updated">按最近更新</option></select>
+      </div>
+      <div class="hint" id="hcount"></div>
+      <div id="hlist"></div>
+    </section>
+
+    <section class="view" id="v-change" hidden>
+      <form class="cap" id="crform"><input id="crnum" placeholder="输入变更单号,如 CHG0030001" aria-label="变更单号" autocomplete="off"><button class="btn" type="submit">读取</button></form>
+      <div class="hint">直接从 ServiceNow 读(mock 模式下是内置的 CHG0030001 到 CHG0030004),同时跑一遍硬规则。</div>
+      <div id="crout"></div>
+    </section>
+
+    <section class="view" id="v-knowledge" hidden>
+      <input class="ksearch" id="ksearch" placeholder="搜知识和任务笔记:补丁、CAB、回退 …" aria-label="搜索">
+      <div class="hits" id="hits" hidden></div>
+      <div class="kgrid" id="kgrid"></div>
+    </section>
+  </main>
+
+  <aside class="aside">
+    <h2>在 Copilot 里怎么说</h2>
+    <div class="say"><b>早安</b><span>它读昨天没做完的和相关知识,给你今天的三件事,确认后写进计划。</span></div>
+    <div class="say"><b>记成任务:(贴一段邮件或聊天)</b><span>它拆成任务存进来,和已有的自动合并。</span></div>
+    <div class="say"><b>记一笔:坑 …</b><span>落到今天的随手记,和这个页面同一份。</span></div>
+    <div class="say"><b>上次 srv-db-01 回退花了多久</b><span>它只从你的知识和任务笔记里找,并说出处。</span></div>
+    <div class="say"><b>收工</b><span>统计今天、把值得留的提出来让你确认、生成明天草稿。</span></div>
+    <div class="hint">这个页面和 Copilot 工具读写同一批文件:cockpit/ 目录。</div>
+  </aside>
+</div>
+
+<script>
+(function(){
+  var S = null;
+  var kinds = { decision:'决定', pitfall:'坑', learned:'学到' };
+  var titles = { morning:'早上好,先看看今天', day:'一边做,一边记', evening:'今天到这里,留下值得留的', knowledge:'你沉淀下来的', history:'做过的每一件事', change:'变更单' };
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function api(path, body){ return fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : undefined).then(function(r){ return r.json(); }); }
+  function load(){ return api('/api/state').then(function(s){ S = s; render(); }); }
+  function fmtMin(m){ if (m==null) return ''; return m>=60 ? (m/60).toFixed(m%60?1:0)+'h' : m+'m'; }
+  function weekday(d){ return ['周日','周一','周二','周三','周四','周五','周六'][new Date(d+'T00:00:00').getDay()]; }
+
+  function taskHtml(t, opts){
+    opts = opts||{};
+    var sub = [];
+    if (t.est!=null) sub.push('预计 <span class="num">'+fmtMin(t.est)+'</span>');
+    if (t.due) sub.push('截止 <span class="num">'+esc(t.due)+'</span>');
+    if (t.carried) sub.push('已带 <span class="num">'+t.carried+'</span> 天');
+    if (t.source && t.source!=='paste') sub.push(esc(t.source));
+    var more = '<dl class="kn">'
+      + (t.context ? '<dt>来源</dt><dd>'+esc(t.context)+'</dd>' : '')
+      + (t.tags && t.tags.length ? '<dt>标签</dt><dd>'+esc(t.tags.join(' · '))+'</dd>' : '')
+      + '<dt>编号</dt><dd class="num">'+esc(t.id)+'</dd>'
+      + (t.plannedFor ? '<dt>排在</dt><dd class="num">'+esc(t.plannedFor)+'</dd>' : '')
+      + '</dl>';
+    return '<div class="task'+(t.status==='done'?' done':'')+'" data-id="'+esc(t.id)+'">'
+      + '<button class="chk" aria-label="完成"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 6.5l2.5 2.5L10 3.5"/></svg></button>'
+      + '<div><button class="title" data-toggle>'+esc(t.title)+'</button><div class="sub">'+sub.map(function(x){return '<span>'+x+'</span>';}).join('')+'</div><div class="more">'+more+'</div></div>'
+      + '<span class="tag '+esc(t.priority||'P2')+'">'+({P1:'必做',P2:'今天',P3:'可推迟'}[t.priority]||'')+'</span></div>';
+  }
+  function tasksBlock(list, emptyText){ return list.length ? '<div class="tasks">'+list.map(function(t){return taskHtml(t);}).join('')+'</div>' : '<div class="empty">'+emptyText+'</div>'; }
+
+  function render(){
+    var day = S.day, plan = S.planTasks, notes = day.notes||[];
+    document.getElementById('h-date').innerHTML = '<b>'+esc(S.date)+' '+weekday(S.date)+'</b>' + (day.closed ? ' · 今天已收尾' : '');
+    var prevOk = S.previousDay && S.previousDay.closed;
+    document.getElementById('pills').innerHTML =
+      '<span class="pill '+(prevOk?'good':'warn')+'"><span class="dot"></span>'+(S.previousDay ? (prevOk?'昨天收尾已完成':'昨天没有收尾') : '还没有历史')+'</span>'
+      + '<span class="pill '+(S.carryOver.length?'warn':'')+'"><span class="dot"></span><span class="num">'+S.carryOver.length+'</span> 项从前几天带过来</span>'
+      + '<span class="pill"><span class="dot"></span>今天计划 <span class="num">'+plan.length+'</span> 项</span>';
+
+    // rail foot
+    var streak = 0, st = S.recentStats.slice().reverse();
+    for (var i=0;i<st.length;i++){ if (st[i].date===S.date || streak===0 || true) { } }
+    streak = countStreak(S.recentStats);
+    document.getElementById('f-streak').textContent = streak;
+    document.getElementById('f-know').textContent = S.knowledge.reduce(function(a,c){return a+c.entries;},0);
+    document.getElementById('f-open').textContent = S.openTasks.length;
+
+    // morning
+    document.getElementById('brief').innerHTML = day.brief ? '<p>'+esc(day.brief)+'</p>' : '<div class="empty">还没有今天的简报。在 Copilot 里说 <code>早安</code>,它会读昨天没做完的和相关知识,给你今天的三件事。</div>';
+    var tl = day.timeline||[];
+    document.getElementById('timeline').innerHTML = tl.length ? '<div class="tl">'+tl.map(function(s){ return '<div class="tl-row"><div class="tl-t">'+esc(s.time)+'</div><div class="tl-l"></div><div class="tl-b"><b>'+esc(s.label)+'</b>'+(s.minutes?' <span class="m">· '+fmtMin(s.minutes)+'</span>':'')+'</div></div>'; }).join('')+'</div>' : '<div class="empty">晨间启动时会排出来</div>';
+    document.getElementById('carry').innerHTML = tasksBlock(S.carryOver, '没有拖着的任务');
+    var last7 = S.recentStats.slice(-7), planned=0, done=0, ks=0;
+    last7.forEach(function(d){ planned+=d.planned; done+=d.done; ks+=d.knowledgeSaved; });
+    document.getElementById('stats7').innerHTML =
+      '<div class="stat"><div class="v num">'+done+'<small>/'+planned+'</small></div><div class="k">完成 / 计划</div></div>'
+      + '<div class="stat"><div class="v num">'+last7.length+'</div><div class="k">收尾的天数</div></div>'
+      + '<div class="stat acc"><div class="v num">'+ks+'</div><div class="k">新沉淀的知识</div></div>';
+
+    // day
+    var doneN = plan.filter(function(t){return t.status==='done';}).length;
+    document.getElementById('plan-meta').innerHTML = '<span class="num">'+doneN+'</span>/<span class="num">'+plan.length+'</span> 完成 · 点标题展开';
+    document.getElementById('plan').innerHTML = tasksBlock(plan, '今天还没排计划。在 Copilot 里说 <code>早安</code>,或者贴一段任务让它 <code>记成任务</code>。');
+    var planIds = plan.map(function(t){return t.id;});
+    var others = S.openTasks.filter(function(t){ return planIds.indexOf(t.id)<0; });
+    document.getElementById('others').innerHTML = tasksBlock(others, '没有了');
+    document.getElementById('log').innerHTML = notes.map(function(n){ return '<li><span class="t num">'+esc(n.t)+'</span><span>'+(n.kind?'<span class="kind '+n.kind+'">'+kinds[n.kind]+'</span>':'')+esc(n.text)+(n.taskId?' <span class="num" style="color:var(--ink-4)">'+esc(n.taskId)+'</span>':'')+'</span></li>'; }).join('') || '<li><span class="t"></span><span class="hint">今天还没记东西</span></li>';
+
+    // evening
+    var estDone = plan.filter(function(t){return t.status==='done';}).reduce(function(a,t){return a+(t.est||0);},0);
+    var worth = notes.filter(function(n){return n.kind;});
+    document.getElementById('review').innerHTML =
+      '<div class="card"><div class="sec-lbl">完成</div><div class="v num" style="font-family:var(--mono);font-size:26px">'+doneN+'<small style="font-size:14px;color:var(--ink-3)">/'+plan.length+'</small></div><div class="bar"><i style="width:'+(plan.length?doneN/plan.length*100:0)+'%"></i></div></div>'
+      + '<div class="card"><div class="sec-lbl">投入</div><div class="num" style="font-family:var(--mono);font-size:26px">'+(estDone/60).toFixed(1)+'<small style="font-size:14px;color:var(--ink-3)">h</small></div><div class="hint">按完成任务的预估累计</div></div>'
+      + '<div class="card"><div class="sec-lbl">记录</div><div class="num" style="font-family:var(--mono);font-size:26px">'+notes.length+'</div><div class="hint">'+worth.length+' 条带分类,可沉淀</div></div>'
+      + '<div class="card"><div class="sec-lbl">带到明天</div><div class="num" style="font-family:var(--mono);font-size:26px">'+(plan.length-doneN)+'</div><div class="hint">今天没完成的</div></div>';
+    var topics = S.knowledge.map(function(k){return k.topic;});
+    var dg = '';
+    notes.forEach(function(n, i){
+      if (!n.kind) return;
+      dg += '<div class="dg'+(n.saved?' saved':'')+'" data-i="'+i+'"><div class="k">'+kinds[n.kind]+(n.taskId?' · '+esc(n.taskId):'')+'</div><div>'+esc(n.text)+'</div>'
+        + (n.saved ? '<div class="hint">已入库</div>' : '<div class="row"><input list="topics" placeholder="主题(已有的或新的)" class="dg-topic"><input placeholder="标题" class="dg-title" value="'+esc(n.text.slice(0,24))+'"><button class="btn dg-save">沉淀</button></div>')
+        + '</div>';
+    });
+    document.getElementById('digest').innerHTML = (dg || '<div class="empty">今天的随手记里还没有带「决定 / 坑 / 学到」的条目</div>') + '<datalist id="topics">'+topics.map(function(t){return '<option value="'+esc(t)+'">';}).join('')+'</datalist>';
+    var autoSum = '今天完成 '+doneN+'/'+plan.length+' 项' + (plan.length-doneN>0 ? ',' + (plan.length-doneN) + ' 项带到明天' : '') + (worth.length ? ';有 '+worth.length+' 条值得沉淀' : '') + '。';
+    document.getElementById('summary').textContent = day.summary || autoSum;
+    document.getElementById('closebtn').disabled = !!day.closed;
+    document.getElementById('closebtn').textContent = day.closed ? '今天已收尾' : '收尾并记入统计';
+    var tm = (day.tomorrow||[]).map(function(id){ return S.openTasks.concat(plan).filter(function(t){return t.id===id;})[0]; }).filter(Boolean);
+    document.getElementById('tomorrow').innerHTML = tm.length ? tasksBlock(tm,'') : '<div class="empty">收尾时 Copilot 会给出明天的草稿</div>';
+
+    // knowledge
+    document.getElementById('kgrid').innerHTML = S.knowledge.length ? S.knowledge.map(function(k){ return '<div class="kc"><h3>'+esc(k.topic)+'</h3><p>'+esc(k.latestTitle||'')+'</p><div class="foot"><span>'+k.entries+' 条</span><span>'+esc(k.lastUpdated||'')+'</span></div></div>'; }).join('') : '<div class="empty" style="grid-column:1/-1">还没有沉淀。晚间收尾时点「沉淀」,或在 Copilot 里说"把这个记进知识库"。</div>';
+
+    bind();
+  }
+  function countStreak(stats){
+    var n=0, d=new Date(S.date+'T00:00:00');
+    var set={}; stats.forEach(function(s){ set[s.date]=1; });
+    if (!set[S.date]) d.setDate(d.getDate()-1);
+    while (set[d.toISOString().slice(0,10)]) { n++; d.setDate(d.getDate()-1); }
+    return n;
+  }
+
+  function show(v){
+    document.querySelectorAll('.view').forEach(function(el){ el.hidden = el.id !== 'v-'+v; });
+    document.querySelectorAll('.nav button').forEach(function(b){ if (b.dataset.view===v) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
+    document.getElementById('vtitle').textContent = titles[v];
+    if (v==='history') loadHistory();
+    if (v==='change') { var n = document.getElementById('crnum').value.trim(); if (n && !document.getElementById('crout').innerHTML) loadChange(n); }
+    try { localStorage.setItem('cockpit-view', v); } catch(e){}
+  }
+
+  // ── history: sorted by time, keyword reaches notes and knowledge ──
+  var statusName = { done:'已完成', todo:'未完成', doing:'进行中', dropped:'已放弃' };
+  function loadHistory(){
+    var q = document.getElementById('hq').value.trim(), st = document.getElementById('hstatus').value, sort = document.getElementById('hsort').value;
+    api('/api/history?q='+encodeURIComponent(q)+'&status='+st+'&sort='+sort+'&limit=300').then(function(rows){
+      document.getElementById('hcount').textContent = rows.length ? rows.length+' 条,'+({created:'按创建时间',done:'按完成时间',updated:'按最近更新'}[sort])+',最新在前' : (q ? '没有匹配的' : '还没有任务');
+      var html = '', month = '';
+      rows.forEach(function(h){
+        var t = h.task, when = h.sortTime || t.createdAt || '';
+        var m = when.slice(0,7);
+        if (m !== month) { month = m; html += '<div class="hmonth">'+esc(m || '未知月份')+'</div>'; }
+        var meta = [];
+        if (t.est!=null) meta.push('预计 '+fmtMin(t.est));
+        if (t.spent!=null) meta.push('实际 '+fmtMin(t.spent));
+        if (t.carried) meta.push('拖了 '+t.carried+' 天');
+        if (h.days.length) meta.push('排过 '+h.days.length+' 天');
+        if (h.notes.length) meta.push(h.notes.length+' 条笔记');
+        if (h.knowledge.length) meta.push('沉淀 '+h.knowledge.length+' 条');
+        if (t.source) meta.push(esc(t.source));
+        var body = '';
+        if (t.context) body += '<div class="hsec"><div class="k">来源 · 原话</div><pre>'+esc(t.context)+'</pre></div>';
+        if (h.notes.length) body += '<div class="hsec"><div class="k">过程记录</div><ul>'+h.notes.map(function(n){ return '<li><span class="d">'+esc(n.date)+' '+esc(n.t)+'</span><span>'+(n.kind?'<span class="kind '+n.kind+'">'+kinds[n.kind]+'</span>':'')+esc(n.text)+'</span></li>'; }).join('')+'</ul></div>';
+        if (h.knowledge.length) body += '<div class="hsec"><div class="k">沉淀出的知识</div>'+h.knowledge.map(function(k){ return '<span class="kref">'+esc(k.topic)+' · '+esc(k.title)+' <span class="d">'+esc(k.date)+'</span></span>'; }).join('')+'</div>';
+        var facts = '<ul>'
+          + '<li><span class="d">编号</span><span class="num">'+esc(t.id)+'</span></li>'
+          + '<li><span class="d">创建</span><span class="num">'+esc(t.createdAt||'')+'</span></li>'
+          + (t.doneAt ? '<li><span class="d">完成</span><span class="num">'+esc(t.doneAt)+'</span></li>' : '')
+          + (t.due ? '<li><span class="d">截止</span><span class="num">'+esc(t.due)+'</span></li>' : '')
+          + (h.days.length ? '<li><span class="d">排在</span><span class="num">'+esc(h.days.join(' · '))+'</span></li>' : '')
+          + (t.tags && t.tags.length ? '<li><span class="d">标签</span><span>'+esc(t.tags.join(' · '))+'</span></li>' : '')
+          + '</ul>';
+        body += '<div class="hsec"><div class="k">时间与归档</div>'+facts+'</div>';
+        if (h.notesText) body += '<div class="hsec" style="grid-column:1/-1"><div class="k">任务笔记文件</div><pre>'+esc(h.notesText)+'</pre></div>';
+        html += '<div class="hrow"><button class="hrow-h"><span class="hdate">'+esc(when.slice(0,16))+'</span><span><div class="htitle">'+esc(t.title)+'</div><div class="hmeta">'+meta.map(function(x){return '<span>'+x+'</span>';}).join('')+'</div></span><span class="hst '+esc(t.status)+'">'+(statusName[t.status]||esc(t.status))+'</span></button><div class="hbody">'+body+'</div></div>';
+      });
+      document.getElementById('hlist').innerHTML = html;
+      document.querySelectorAll('.hrow-h').forEach(function(b){ b.onclick = function(){ b.closest('.hrow').classList.toggle('open'); }; });
+    });
+  }
+  // ── change request viewer ──
+  var LONG = [['description','描述'],['justification','变更理由'],['implementation_plan','实施计划'],['risk_impact_analysis','风险与影响分析'],['backout_plan','回退方案'],['test_plan','测试计划']];
+  var BASIC = [['type','类型'],['category','分类'],['risk','风险'],['impact','影响'],['priority','优先级'],['state','状态'],['approval','审批'],['cmdb_ci','配置项'],['assignment_group','负责组'],['assigned_to','负责人'],['requested_by','申请人'],['start_date','计划开始'],['end_date','计划结束'],['close_code','关闭代码'],['sys_updated_on','最近更新']];
+  function loadChange(num){
+    var out = document.getElementById('crout');
+    out.innerHTML = '<div class="empty">读取中 …</div>';
+    api('/api/change?number='+encodeURIComponent(num)).then(function(r){
+      if (r.error) { out.innerHTML = '<div class="empty">'+esc(r.error)+'</div>'; return; }
+      var f = r.change.fields || {}, tasks = r.change.tasks || [], apr = r.change.approvals || [], jr = r.change.journal || [];
+      var chips = '<span class="pill '+(r.passed?'good':'bad')+'"><span class="dot"></span>硬规则 '+(r.passed?'通过':r.violations.filter(function(v){return v.severity==='error';}).length+' 处不合规')+'</span>'
+        + (f.approval ? '<span class="pill '+({approved:'good',rejected:'bad'}[String(f.approval).toLowerCase()]||'')+'"><span class="dot"></span>审批 '+esc(f.approval)+'</span>' : '')
+        + (f.state ? '<span class="pill"><span class="dot"></span>'+esc(f.state)+'</span>' : '');
+      var basic = BASIC.filter(function(p){ return f[p[0]]; }).map(function(p){ return '<div class="cr-f"><div class="k">'+p[1]+'</div><div class="v'+(/date|updated/.test(p[0])?' num':'')+'">'+esc(f[p[0]])+'</div></div>'; }).join('');
+      var extra = Object.keys(f).filter(function(k){ return k.indexOf('u_')===0 && f[k]; }).map(function(k){ return '<div class="cr-f"><div class="k">'+esc(k)+'</div><div class="v">'+esc(f[k])+'</div></div>'; }).join('');
+      var longs = LONG.map(function(p){ return '<div class="cr-sec"><h3>'+p[1]+'</h3><pre'+(f[p[0]]?'':' class="empty"')+'>'+(f[p[0]]?esc(f[p[0]]):'(空)')+'</pre></div>'; }).join('');
+      var tbl = tasks.length ? '<div class="cr-wrap"><table class="cr-t"><tr><th>#</th><th>编号</th><th>任务</th><th>计划开始</th><th>计划结束</th><th>负责组</th></tr>'+tasks.map(function(t){ return '<tr><td class="num">'+esc(t.order||'')+'</td><td class="num">'+esc(t.number||'')+'</td><td>'+esc(t.short_description||'')+'</td><td class="num">'+esc(t.planned_start_date||'')+'</td><td class="num">'+esc(t.planned_end_date||'')+'</td><td>'+esc(t.assignment_group||'')+'</td></tr>'; }).join('')+'</table></div>' : '<div class="empty">没有 change task</div>';
+      var vio = r.violations.length ? '<div class="vio">'+r.violations.map(function(v){ return '<div class="vio-row"><span class="id">'+esc(v.ruleId)+'</span><span class="sev '+esc(v.severity)+'">'+esc(v.severity)+'</span><span>'+esc(v.message)+(v.suggestion?'<span class="sug">建议:'+esc(v.suggestion)+'</span>':'')+'</span></div>'; }).join('')+'</div>' : '<div class="empty">全部硬规则通过</div>';
+      var aprs = apr.length ? '<ul class="jr">'+apr.map(function(a){ return '<li><span class="d">'+esc(a.sys_updated_on||'')+'</span><span><span class="who">'+esc(a.approver||'')+'</span> · '+esc(a.state||'')+(a.comments?'<br>'+esc(a.comments):'')+'</span></li>'; }).join('')+'</ul>' : '<div class="empty">没有审批记录</div>';
+      var jrs = jr.length ? '<ul class="jr">'+jr.map(function(j){ return '<li><span class="d">'+esc(j.sys_created_on||'')+'</span><span><span class="who">'+esc(j.sys_created_by||'')+'</span> · '+esc(j.element||'')+'<br>'+esc(j.value||'')+'</span></li>'; }).join('')+'</ul>' : '<div class="empty">没有工作备注</div>';
+      var sim = r.similar.length ? '<div class="sim">'+r.similar.map(function(s){ return '<a data-cr="'+esc(s.number)+'"><span class="n">'+esc(s.number)+'</span><span>'+esc(s.short_description)+'</span><span class="num" style="color:var(--ink-3)">'+esc(s.start_date)+'</span></a>'; }).join('')+'</div>' : '<div class="hint">本地历史库里没有同一台机器的过审 CR(先 sync_history)</div>';
+      out.innerHTML =
+        '<div class="card"><div class="cr-head"><div><div class="cr-num">'+esc(r.change.number)+'</div><div class="cr-title">'+esc(f.short_description||'')+'</div></div><div class="cr-chips">'+chips+'</div></div>'
+        + '<div class="cr-grid" style="margin-top:16px">'+basic+extra+'</div></div>'
+        + '<div class="grid2" style="grid-template-columns:minmax(0,1.4fr) minmax(280px,1fr)">'
+        +   '<div class="card">'+longs+'</div>'
+        +   '<div style="display:flex;flex-direction:column;gap:16px">'
+        +     '<div class="card"><div class="card-h"><h2>硬规则校验</h2><span class="meta">'+r.violations.length+' 条</span></div>'+vio+'</div>'
+        +     '<div class="card"><div class="card-h"><h2>同一台机器的过审 CR</h2></div>'+sim+'</div>'
+        +   '</div></div>'
+        + '<div class="card"><div class="card-h"><h2>Change tasks</h2><span class="meta">'+tasks.length+' 个</span></div>'+tbl+'</div>'
+        + '<div class="grid2"><div class="card"><div class="card-h"><h2>审批记录</h2></div>'+aprs+'</div><div class="card"><div class="card-h"><h2>工作备注</h2></div>'+jrs+'</div></div>';
+      document.querySelectorAll('[data-cr]').forEach(function(a){ a.onclick = function(){ document.getElementById('crnum').value = a.dataset.cr; loadChange(a.dataset.cr); }; });
+      try { localStorage.setItem('cockpit-cr', num); } catch(e){}
+    });
+  }
+  document.getElementById('crform').addEventListener('submit', function(e){ e.preventDefault(); var n = document.getElementById('crnum').value.trim(); if (n) loadChange(n); });
+  try { var lastCr = localStorage.getItem('cockpit-cr'); if (lastCr) { document.getElementById('crnum').value = lastCr; } } catch(e){}
+
+  var histT;
+  document.getElementById('hq').addEventListener('input', function(){ clearTimeout(histT); histT = setTimeout(loadHistory, 250); });
+  document.getElementById('hstatus').addEventListener('change', loadHistory);
+  document.getElementById('hsort').addEventListener('change', loadHistory);
+  document.querySelectorAll('[data-view]').forEach(function(b){ b.addEventListener('click', function(){ show(b.dataset.view); }); });
+
+  function bind(){
+    document.querySelectorAll('.task .chk').forEach(function(c){ c.onclick = function(){ api('/api/toggle', {id:c.closest('.task').dataset.id}).then(load); }; });
+    document.querySelectorAll('[data-toggle]').forEach(function(b){ b.onclick = function(){ b.closest('.task').classList.toggle('open'); }; });
+    document.querySelectorAll('.dg-save').forEach(function(b){ b.onclick = function(){
+      var dg = b.closest('.dg'), topic = dg.querySelector('.dg-topic').value.trim(), title = dg.querySelector('.dg-title').value.trim();
+      if (!topic) { dg.querySelector('.dg-topic').focus(); return; }
+      var n = S.day.notes[+dg.dataset.i];
+      api('/api/save', {topic:topic, title:title||n.text.slice(0,24), content:n.text, noteIndex:+dg.dataset.i, taskId:n.taskId||null}).then(load);
+    }; });
+  }
+  document.getElementById('capform').addEventListener('submit', function(e){
+    e.preventDefault(); var inp = document.getElementById('capin'), v = inp.value.trim(); if (!v) return;
+    api('/api/note', {text:v}).then(function(){ inp.value=''; load(); });
+  });
+  document.getElementById('closebtn').addEventListener('click', function(){
+    var s = document.getElementById('sumin').value.trim() || document.getElementById('summary').textContent;
+    api('/api/close', {summary:s}).then(load);
+  });
+  var searchT;
+  document.getElementById('ksearch').addEventListener('input', function(){
+    var q = this.value.trim(); clearTimeout(searchT);
+    var hits = document.getElementById('hits');
+    if (!q) { hits.hidden = true; document.getElementById('kgrid').hidden = false; return; }
+    searchT = setTimeout(function(){ api('/api/search?q='+encodeURIComponent(q)).then(function(r){
+      hits.hidden = false; document.getElementById('kgrid').hidden = true;
+      hits.innerHTML = r.length ? r.map(function(h){ return '<div class="hit"><div class="f">'+esc(h.file)+'</div><pre>'+esc(h.lines)+'</pre></div>'; }).join('') : '<div class="empty">没找到</div>';
+    }); }, 250);
+  });
+
+  var v = 'morning'; try { v = localStorage.getItem('cockpit-view') || 'morning'; } catch(e){}
+  show(v);
+  load().catch(function(){ document.getElementById('brief').innerHTML = '<div class="empty">连不上本地服务,确认 MCP server 在跑。</div>'; });
+  setInterval(function(){ if (!document.hidden) load(); }, 20000);
+})();
+</script>
+</body>
+</html>
