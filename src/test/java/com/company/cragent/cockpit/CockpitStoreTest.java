@@ -75,6 +75,11 @@ class CockpitStoreTest {
         assertThat(s.search("40 分钟", 10)).hasSize(1);
         assertThat(s.search("40 分钟", 10).get(0).get("file")).startsWith("knowledge/");
         assertThat(s.readKnowledge("Oracle RU 补丁流程")).contains("来源:任务 T-0001");
+
+        // file names stay ASCII even for Chinese topics; the topic lives in the first line
+        assertThat(s.topicFile("Oracle RU 补丁流程").getFileName().toString()).matches("[a-z0-9-]+\\.md");
+        assertThat(s.topicFile("CAB 审批").getFileName().toString()).matches("[a-z0-9-]+\\.md");
+        assertThat(CockpitStore.slug("Release rollback")).isEqualTo("release-rollback");
     }
 
     @Test

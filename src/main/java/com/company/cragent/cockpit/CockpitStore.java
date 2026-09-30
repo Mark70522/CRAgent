@@ -220,9 +220,22 @@ public class CockpitStore {
 
     // ------------------------------------------------------------------ knowledge
 
+    /** The file for a topic: an existing file whose first line is "# topic" (whatever it is named), else a new ASCII-named one. */
+    public synchronized Path topicFile(String topic) {
+        String want = topic.trim().toLowerCase();
+        if (Files.isDirectory(props.knowledge())) {
+            try (Stream<Path> s = Files.list(props.knowledge())) {
+                for (Path p : s.filter(x -> x.toString().endsWith(".md")).collect(Collectors.toList())) {
+                    String first = readString(p).lines().findFirst().orElse("");
+                    if (first.startsWith("# ") && first.substring(2).trim().toLowerCase().equals(want)) return p;
+                }
+            } catch (IOException e) { throw new IllegalStateException(e); }
+        }
+        return props.knowledge().resolve(slug(topic) + ".md");
+    }
+
     public synchronized Path saveKnowledge(String topic, String title, String content, String sourceDate, String taskId) {
-        String slug = slug(topic);
-        Path f = props.knowledge().resolve(slug + ".md");
+        Path f = topicFile(topic);
         String head = Files.exists(f) ? "" : "# " + topic.trim() + "\n";
         StringBuilder sb = new StringBuilder(head);
         sb.append("\n## ").append(title.trim()).append("  (").append(sourceDate == null ? today() : sourceDate).append(")\n\n");
@@ -259,8 +272,14 @@ public class CockpitStore {
     }
 
     public synchronized String readKnowledge(String topic) {
-        Path f = props.knowledge().resolve(slug(topic) + ".md");
-        return Files.exists(f) ? readString(f) : "";
+        Path f = topicFile(topic);
+        if (Files.exists(f)) return readString(f);
+        // tolerate a partial topic name ("Oracle RU" for "Oracle RU 补丁流程")
+        String q = topic.trim().toLowerCase();
+        for (KnowledgeCard c : knowledgeCards()) {
+            if (c.topic.toLowerCase().contains(q)) return readString(props.dir().resolve(c.file));
+        }
+        return "";
     }
 
     /** Case-insensitive substring search over knowledge files, task notes and the day logs; returns file + matching lines. */
@@ -450,9 +469,18 @@ public class CockpitStore {
         }
         return t;
     }
+    /**
+     * File name for a topic: ASCII only, so the files survive zip / git / build tools on machines whose
+     * default encoding is not UTF-8. Latin words are kept; anything else (Chinese titles) becomes a short
+     * stable hash. The readable topic name is always the first line inside the file.
+     */
     static String slug(String s) {
-        String x = s.trim().toLowerCase().replaceAll("[\\s/\\\\:*?\"<>|]+", "-").replaceAll("-+", "-").replaceAll("^-|-$", "");
-        return x.isEmpty() ? "misc" : x;
+        String t = s.trim();
+        String ascii = t.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("-+", "-").replaceAll("^-|-$", "");
+        boolean lossy = !t.replaceAll("[\\s/\\\\:*?\"<>|._-]+", "").chars().allMatch(c -> c < 128);
+        if (!lossy && !ascii.isEmpty()) return ascii;
+        String hash = Integer.toHexString(t.hashCode() & 0x7fffffff);
+        return (ascii.isEmpty() ? "topic" : ascii) + "-" + hash;
     }
 
     private <T> T read(Path p, TypeReference<T> type, T dflt) {
