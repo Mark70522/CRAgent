@@ -56,6 +56,12 @@ Report what the endpoint returned (the number if it is in the response). Remind 
 submitting for approval is still done by them; once submitted they can say "T-xxxx 等审批" and the
 task moves to waiting.
 
+**ICE.** Every CR also has to be registered in ICE. If `status` shows ICE configured: right after the CR
+is created, propose the ICE fields (from the CR: number, title, scope, window, owner - named as the ICE
+interface wants them; the user's past ICE records in `task_history` show the shape), show them, and on
+the user's word `create_ice` with `confirmed=true`, the CR number and the same `taskId`. The task then
+shows both numbers. If ICE is not configured, say once that the ICE step is still manual.
+
 ## 7. Learn
 
 If a correction looks like a general rule ("we always ...", "the boss wants ..."), offer to record it

@@ -33,7 +33,7 @@ public record ServiceNowProperties(
         Integer timeoutMs,
         /** yaml (default: endpoints described below) or company (your CompanyServiceNowClient). */
         String client,
-        Map<String, Endpoint> endpoints) {
+        Map<String, Endpoint> endpoints) implements HttpApi {
 
     public String client() { return client == null || client.isBlank() ? "yaml" : client.trim().toLowerCase(); }
 

@@ -171,6 +171,7 @@ public class CockpitStore {
                 case "scheduledAt", "scheduled" -> t.scheduledAt = blankToNull(v);
                 case "waitingOn" -> { t.waitingOn = blankToNull(v); if (t.waitingOn != null && t.isActionable()) t.status = "waiting"; }
                 case "cr" -> t.cr = blankToNull(v);
+                case "ice" -> t.ice = blankToNull(v);
                 case "repeat" -> t.repeat = blankToNull(v);
                 case "context" -> t.context = v;
                 case "tags" -> t.tags = v == null ? new ArrayList<>() : Arrays.stream(v.split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());

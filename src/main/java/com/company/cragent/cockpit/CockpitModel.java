@@ -25,6 +25,7 @@ public final class CockpitModel {
         public String scheduledAt;    // yyyy-MM-dd HH:mm : when the work actually runs (a maintenance window), if different
         public String waitingOn;      // what a waiting task waits for: approval, a reply, a window
         public String cr;             // linked change request number (CHG...), set by create_change or the user
+        public String ice;            // the CR's ICE record id, set by create_ice
         public String repeat;         // monthly | weekly | quarterly | free text : recurring work, next one is created when this is done
         public String context;        // where it came from, one line
         public List<String> tags = new ArrayList<>();

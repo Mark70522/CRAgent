@@ -11,6 +11,9 @@ cr-agent(一个 Java 进程,Spring Boot 3.5 + Spring AI MCP,stdio)
    │     ServiceNowClient 接口(读 / 建 / 改三个方法)
    │       ├── YamlServiceNowClient   按 cr-agent.yml 里的 endpoints 描述调(默认)
    │       └── CompanyServiceNowClient 你自己实现,SnHttp 提供认证和 HTTP
+   │     IceClient 接口(建 / 改两个方法,CR 在 ICE 里的登记)
+   │       ├── YamlIceClient          ice: 段的 endpoints(默认)
+   │       └── CompanyIceClient       你自己实现,IceHttp 同一套认证和 HTTP
    │     TemplateService     模板 → 草稿(字段名 = 你们接口的名字)
    │     RuleEngine          hard-rules.yaml 机器校验
    │     Inventory           Excel 服务器清单
@@ -78,6 +81,7 @@ create-change 的 body:不写模板 = 草稿字段平铺;写模板可用 `${fiel
 |---|---|
 | 状态 | `status`(接口、清单、规则、范例、回归、页面、审计一次看全) |
 | ServiceNow | `get_change` `create_change` `update_change`(建和改都要 confirmed=true) |
+| ICE | `create_ice` `update_ice`(都要 confirmed=true;`ice:` 段没配就拒绝) |
 | 清单 | `lookup_ci` `lookup_service` |
 | 模板 / 校验 | `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` |
 | 规则与范例 | `read_rules` `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` `list_examples` `read_example` `eval_rules` |
@@ -110,6 +114,7 @@ src/main/java/com/company/cragent/
 ├── audit/         AuditLog AuditedToolCallback
 ├── knowledge/     ExampleStore(YAML 范例) Regression(规则回归)
 ├── servicenow/    ServiceNowClient(接口) YamlServiceNowClient CompanyServiceNowClient(你填) SnHttp(认证/HTTP/JSON) EndpointClient(yml 描述执行器) ServiceNowException
+├── ice/           IceClient(接口) YamlIceClient CompanyIceClient(你填) IceHttp IceEndpoints(ice: 段上的同一套 SnHttp / EndpointClient) IceRecord
 ├── inventory/     Inventory(Excel/CSV)
 ├── template/      ChangeTemplate TemplateService
 ├── validation/    HardRule RuleEngine

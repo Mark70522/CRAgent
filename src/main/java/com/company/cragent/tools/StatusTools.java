@@ -3,6 +3,7 @@ package com.company.cragent.tools;
 import com.company.cragent.audit.AuditLog;
 import com.company.cragent.config.CockpitProperties;
 import com.company.cragent.config.KnowledgeProperties;
+import com.company.cragent.ice.IceClient;
 import com.company.cragent.inventory.Inventory;
 import com.company.cragent.knowledge.ExampleStore;
 import com.company.cragent.knowledge.Regression;
@@ -30,9 +31,11 @@ public class StatusTools {
     private final CockpitProperties cockpit;
     private final AuditLog audit;
 
-    public StatusTools(ServiceNowClient sn, Inventory inventory, RuleEngine rules, TemplateService templates, ExampleStore examples,
+    private final IceClient ice;
+
+    public StatusTools(ServiceNowClient sn, IceClient ice, Inventory inventory, RuleEngine rules, TemplateService templates, ExampleStore examples,
                        Regression regression, KnowledgeProperties knowledge, CockpitProperties cockpit, AuditLog audit) {
-        this.sn = sn; this.inventory = inventory; this.rules = rules; this.templates = templates; this.examples = examples;
+        this.sn = sn; this.ice = ice; this.inventory = inventory; this.rules = rules; this.templates = templates; this.examples = examples;
         this.regression = regression; this.knowledge = knowledge; this.cockpit = cockpit; this.audit = audit;
     }
 
@@ -43,6 +46,7 @@ public class StatusTools {
     public Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("serviceNow", safe(sn::describe));
+        m.put("ice", safe(ice::describe));
         m.put("inventory", safe(() -> inventory.entries().size() + " servers from " + inventory.source()));
         m.put("knowledgeDir", knowledge.knowledgeDir().toAbsolutePath().normalize().toString());
         m.put("hardRules", safe(() -> rules.loadRules().size()));

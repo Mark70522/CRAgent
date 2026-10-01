@@ -1,5 +1,6 @@
 package com.company.cragent.servicenow;
 
+import com.company.cragent.config.HttpApi;
 import com.company.cragent.config.ServiceNowProperties;
 import com.company.cragent.config.ServiceNowProperties.Endpoint;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -19,11 +20,12 @@ import java.util.regex.Pattern;
  * {@code result} path. Used by YamlServiceNowClient; a hand-written client does not need it.
  */
 @Component
+@org.springframework.context.annotation.Primary   // the ServiceNow one; IceHttp / IceEndpoints are asked for by their own type
 public class EndpointClient {
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([a-zA-Z0-9_.-]+)}");
 
-    private final ServiceNowProperties props;
+    private final HttpApi props;
     private final SnHttp http;
     private final ObjectMapper json;
 
@@ -34,6 +36,11 @@ public class EndpointClient {
 
     @org.springframework.beans.factory.annotation.Autowired
     public EndpointClient(ServiceNowProperties props, SnHttp http, ObjectMapper json) {
+        this((HttpApi) props, http, json);
+    }
+
+    /** Same executor over another configured interface (see IceEndpoints). */
+    protected EndpointClient(HttpApi props, SnHttp http, ObjectMapper json) {
         this.props = props;
         this.http = http;
         this.json = json;

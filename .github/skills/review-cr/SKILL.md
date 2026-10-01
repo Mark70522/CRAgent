@@ -28,6 +28,10 @@ Then a verdict: ready to submit / needs the fixes above.
 Show exactly which fields will change and the new text; after the user agrees, `update_change` with
 `confirmed=true`. Then `get_change` again and show the new hard-rule result.
 
+If the change touched anything ICE also carries (title, window, scope, owner) and the task has an `ice`
+id (`get_change` returns the linked task), propose the matching `update_ice` and send it only after the
+user agrees. A CR with no ICE id yet: offer `create_ice` (see create-cr).
+
 ## 5. Learn from a rejection
 
 If the user says it was rejected: ask for the reason, then for each reason decide whether a rule already

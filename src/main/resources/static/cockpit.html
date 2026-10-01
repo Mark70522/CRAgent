@@ -338,7 +338,7 @@ table.cr-t td.num{white-space:nowrap}
     opts = opts||{};
     var sub = [];
     if (t.status==='waiting') sub.push('等 '+esc(t.waitingOn||'…'));
-    if (t.cr) sub.push('<span class="num">'+esc(t.cr)+'</span>');
+    if (t.cr) sub.push('<span class="num">'+esc(t.cr)+'</span>'+(t.ice?' <small>ICE '+esc(t.ice)+'</small>':' <small>未登 ICE</small>'));
     if (t.scheduledAt) sub.push('执行 <span class="num">'+esc(t.scheduledAt)+'</span>');
     if (t.est!=null) sub.push('预计 <span class="num">'+fmtMin(t.est)+'</span>'+(t.estBy==='ai'?'<small>(AI 估)</small>':''));
     if (t.due) sub.push('截止 <span class="num">'+esc(t.due)+'</span>');
@@ -505,6 +505,7 @@ table.cr-t td.num{white-space:nowrap}
           + (t.due ? '<li><span class="d">截止</span><span class="num">'+esc(t.due)+'</span></li>' : '')
           + (t.scheduledAt ? '<li><span class="d">执行</span><span class="num">'+esc(t.scheduledAt)+'</span></li>' : '')
           + (t.cr ? '<li><span class="d">变更单</span><span class="num">'+esc(t.cr)+'</span></li>' : '')
+          + (t.cr ? '<li><span class="d">ICE</span><span class="num">'+(t.ice ? esc(t.ice) : '未登记')+'</span></li>' : '')
           + (h.days.length ? '<li><span class="d">排在</span><span class="num">'+esc(h.days.join(' · '))+'</span></li>' : '')
           + (t.tags && t.tags.length ? '<li><span class="d">标签</span><span>'+esc(t.tags.join(' · '))+'</span></li>' : '')
           + '</ul>';

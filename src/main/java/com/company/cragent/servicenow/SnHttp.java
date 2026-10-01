@@ -1,5 +1,6 @@
 package com.company.cragent.servicenow;
 
+import com.company.cragent.config.HttpApi;
 import com.company.cragent.config.ServiceNowProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,20 +29,27 @@ import java.util.Map;
  * Your implementation only decides which path to call and how to read the response.
  */
 @Component
+@org.springframework.context.annotation.Primary   // the ServiceNow one; IceHttp / IceEndpoints are asked for by their own type
 public class SnHttp {
 
     private static final Logger log = LoggerFactory.getLogger(SnHttp.class);
-    private final ServiceNowProperties props;
+    private final HttpApi props;
     private final ObjectMapper json;
     private RestClient http;   // built on first use so the app starts even before ServiceNow is configured
 
+    @org.springframework.beans.factory.annotation.Autowired
     public SnHttp(ServiceNowProperties props, ObjectMapper json) {
+        this((HttpApi) props, json);
+    }
+
+    /** Same plumbing over another configured interface (see IceHttp). */
+    protected SnHttp(HttpApi props, ObjectMapper json) {
         this.props = props;
         this.json = json;
     }
 
     public ObjectMapper json() { return json; }
-    public ServiceNowProperties props() { return props; }
+    public HttpApi props() { return props; }
 
     /** GET {base-url}{path}; path may include a query string. */
     public JsonNode get(String path) { return exchange(HttpMethod.GET, path, null); }
@@ -58,7 +66,7 @@ public class SnHttp {
 
     /** Same, with extra headers for this one request. */
     public JsonNode exchange(HttpMethod method, String path, Object body, Map<String, String> headers) {
-        if (props.baseUrl() == null || props.baseUrl().isBlank()) throw new ServiceNowException("servicenow.base-url is not set in cr-agent.yml");
+        if (props.baseUrl() == null || props.baseUrl().isBlank()) throw new ServiceNowException("base-url is not set in cr-agent.yml (servicenow: or ice: section)");
         log.info("{} {}", method, path);
         try {
             RestClient.RequestBodySpec req = client().method(method).uri(path);
