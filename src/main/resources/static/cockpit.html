@@ -82,6 +82,9 @@ h1,h2,h3{margin:0}
 .chk{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line-strong);display:grid;place-items:center;margin-top:1px;background:var(--surface);color:#fff}
 .task.done .chk{background:var(--good);border-color:var(--good)}
 .chk svg{width:12px;height:12px;display:none} .task.done .chk svg{display:block}
+.ask{grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;padding:8px 10px;border-radius:8px;background:var(--surface-2);font-size:13px}
+.ask b{font-weight:500} .ask .sp{flex:1} .ask .btn{padding:4px 10px;font-size:12px} .ask .btn.ghost{background:transparent;color:var(--ink-2);border:1px solid var(--line-strong)}
+.task.asking .chk{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .title{font-weight:500;text-align:left}
 .sub{font-size:12px;color:var(--ink-3);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap}
 .tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500;background:var(--surface-2);color:var(--ink-2);white-space:nowrap}
@@ -352,7 +355,30 @@ table.cr-t td.num{white-space:nowrap}
     return '<div class="task'+(t.status==='done'?' done':'')+'" data-id="'+esc(t.id)+'">'
       + '<button class="chk" aria-label="完成"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 6.5l2.5 2.5L10 3.5"/></svg></button>'
       + '<div><button class="title" data-toggle>'+esc(t.title)+'</button><div class="sub">'+sub.map(function(x){return '<span>'+x+'</span>';}).join('')+'</div><div class="more">'+more+'</div></div>'
-      + '<span class="tag '+esc(t.priority||'P2')+'">'+({P1:'必做',P2:'今天',P3:'可推迟'}[t.priority]||'')+'</span></div>';
+      + '<span class="tag '+esc(t.priority||'P2')+'">'+({P1:'必做',P2:'今天',P3:'可推迟'}[t.priority]||'')+'</span>'
+      + '<div class="ask" hidden></div></div>';
+  }
+  // Clicking the box never changes anything by itself: it opens a one-line question inside the card.
+  function askDone(card, t){
+    var ask = card.querySelector('.ask'), html;
+    function btn(label, cls, act){ return '<button type="button" class="btn '+(cls||'')+'" data-act="'+act+'">'+label+'</button>'; }
+    if (t.status === 'done') {
+      html = '<b>改回未完成?</b><span class="sp"></span>' + btn('改回去','', 'reopen') + btn('取消','ghost','cancel');
+    } else if (t.cr) {
+      html = '<b>完成这个任务?</b><span>变更单 <span class="num">'+esc(t.cr)+'</span> 关了吗?</span><span class="sp"></span>'
+        + btn('关了,完成','', 'done') + btn('还没,等关单','ghost','waitclose') + btn('取消','ghost','cancel');
+    } else {
+      html = '<b>标记完成?</b><span>'+esc(t.title)+'</span><span class="sp"></span>' + btn('完成','', 'done') + btn('取消','ghost','cancel');
+    }
+    ask.innerHTML = html; ask.hidden = false; card.classList.add('asking');
+    ask.querySelectorAll('[data-act]').forEach(function(b){ b.onclick = function(){
+      var act = b.dataset.act;
+      if (act === 'cancel') { ask.hidden = true; card.classList.remove('asking'); return; }
+      var body = act === 'done' ? {id:t.id, fields:{status:'done'}}
+               : act === 'reopen' ? {id:t.id, fields:{status:'todo'}}
+               : {id:t.id, fields:{waitingOn:'关 '+t.cr}};
+      api('/api/task', body).then(load);
+    }; });
   }
   function tasksBlock(list, emptyText){ return list.length ? '<div class="tasks">'+list.map(function(t){return taskHtml(t);}).join('')+'</div>' : '<div class="empty">'+emptyText+'</div>'; }
 
@@ -534,7 +560,12 @@ table.cr-t td.num{white-space:nowrap}
   document.querySelectorAll('[data-view]').forEach(function(b){ b.addEventListener('click', function(){ show(b.dataset.view); }); });
 
   function bind(){
-    document.querySelectorAll('.task .chk').forEach(function(c){ c.onclick = function(){ api('/api/toggle', {id:c.closest('.task').dataset.id}).then(load); }; });
+    document.querySelectorAll('.task .chk').forEach(function(c){ c.onclick = function(){
+      var card = c.closest('.task'), id = card.dataset.id;
+      if (!card.querySelector('.ask').hidden) { card.querySelector('.ask').hidden = true; card.classList.remove('asking'); return; }
+      var t = S.planTasks.concat(S.openTasks, S.carryOver).filter(function(x){ return x.id === id; })[0];
+      if (t) askDone(card, t);
+    }; });
     document.querySelectorAll('[data-toggle]').forEach(function(b){ b.onclick = function(){ b.closest('.task').classList.toggle('open'); }; });
     document.querySelectorAll('.dg-save').forEach(function(b){ b.onclick = function(){
       var dg = b.closest('.dg'), topic = dg.querySelector('.dg-topic').value.trim(), title = dg.querySelector('.dg-title').value.trim();

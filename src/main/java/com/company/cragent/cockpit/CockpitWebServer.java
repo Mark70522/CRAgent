@@ -70,6 +70,12 @@ public class CockpitWebServer {
                 Task t = store.task(id).orElseThrow();
                 return store.updateTask(id, Map.of("status", "done".equals(t.status) ? "todo" : "done"), null);
             }));
+            // Page-side task update after the user confirmed in the inline bar: {id, fields:{status|waitingOn|...}, note?}
+            server.createContext("/api/task", ex -> post(ex, b -> {
+                Map<String, String> fields = new LinkedHashMap<>();
+                b.path("fields").fields().forEachRemaining(e -> fields.put(e.getKey(), e.getValue().isNull() ? null : e.getValue().asText()));
+                return store.updateTask(b.path("id").asText(), fields, b.path("note").asText(null));
+            }));
             server.createContext("/api/note", ex -> post(ex, b -> store.capture(null, b.path("text").asText(), b.path("kind").asText(null), b.path("taskId").asText(null))));
             server.createContext("/api/save", ex -> post(ex, b -> {
                 var f = store.saveKnowledge(b.path("topic").asText(), b.path("title").asText(), b.path("content").asText(), null, b.path("taskId").asText(null));
