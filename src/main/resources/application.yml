@@ -1,15 +1,8 @@
-# Internal defaults. Do NOT edit this for your instance: put company settings in ./cr-agent.yml
-# (see cr-agent.example.yml). Paths are relative to the working directory, which
-# .vscode/mcp.json sets to the project folder.
+# Internal defaults. Do NOT edit for your company: put everything company-specific in ./cr-agent.yml
+# (see cr-agent.example.yml). Paths are relative to the working directory (run.bat sets it to the project folder).
 
 spring:
   config:
-    # Config files, later one wins:
-    #   1. ./cr-agent.yml                          in the workspace (non-secret settings)
-    #   2. a file OUTSIDE the workspace            %USERPROFILE%\.cr-agent\cr-agent.yml by default,
-    #                                              or any path set in env var CR_AGENT_CONFIG
-    # Credentials can also be plain env vars: SERVICENOW_PASSWORD / SERVICENOW_TOKEN
-    # (Spring binds them to servicenow.password / servicenow.token). Env vars beat both files.
     import:
       - optional:file:./cr-agent.yml
       - optional:file:${CR_AGENT_CONFIG:${user.home}/.cr-agent/cr-agent.yml}
@@ -20,15 +13,9 @@ spring:
     mcp:
       server:
         name: cr-agent
-        version: 0.1.0
+        version: 0.2.0
         type: SYNC
         stdio: true
-  datasource:
-    url: jdbc:sqlite:./history.db
-    driver-class-name: org.sqlite.JDBC
-  sql:
-    init:
-      mode: always
 
 # File only: stdout is the MCP protocol channel (see logback-spring.xml).
 logging:
@@ -38,24 +25,16 @@ logging:
 cr:
   knowledge-dir: ./knowledge
 
-# Daily task cockpit: files under cockpit/, page on http://127.0.0.1:7777/
 cockpit:
   dir: ./cockpit
   port: 7777
   web: true
 
-# Server inventory. Blank file = use the ServiceNow CMDB instead.
 inventory:
   file: ./knowledge/inventory.xlsx
   sheet: ""
   maintenance-window: "Sun 00:00-06:00"
 
+# ServiceNow: nothing here; describe your interfaces in cr-agent.yml (servicenow.endpoints).
 servicenow:
-  mock: true
-  instance: ""
-  user: ""
-  password: ""
-  token: ""
-  ci-table: cmdb_ci_server
-  closed-states: "3,4,7,-4"
   timeout-ms: 30000

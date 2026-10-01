@@ -1,11 +1,9 @@
 package com.company.cragent.config;
 
-import com.company.cragent.tools.ChangeTools;
-import com.company.cragent.tools.CmdbTools;
 import com.company.cragent.tools.CockpitTools;
-import com.company.cragent.tools.DiagnosticsTools;
-import com.company.cragent.tools.HistoryTools;
+import com.company.cragent.tools.InventoryTools;
 import com.company.cragent.tools.KnowledgeTools;
+import com.company.cragent.tools.ServiceNowTools;
 import com.company.cragent.tools.TemplateTools;
 import com.company.cragent.tools.ValidationTools;
 import org.springframework.ai.tool.ToolCallbackProvider;
@@ -13,21 +11,15 @@ import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** Registers every @Tool method as an MCP tool. Add a new tool class here to expose it. */
+/** Registers every @Tool method as an MCP tool. */
 @Configuration
 public class McpToolConfig {
 
     @Bean
-    public ToolCallbackProvider crTools(CmdbTools cmdb,
-                                        ChangeTools change,
-                                        TemplateTools template,
-                                        ValidationTools validation,
-                                        HistoryTools history,
-                                        KnowledgeTools knowledge,
-                                        DiagnosticsTools diagnostics,
-                                        CockpitTools cockpit) {
+    public ToolCallbackProvider crTools(InventoryTools inventory, ServiceNowTools serviceNow, TemplateTools template,
+                                        ValidationTools validation, KnowledgeTools knowledge, CockpitTools cockpit) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(cmdb, change, template, validation, history, knowledge, diagnostics, cockpit)
+                .toolObjects(inventory, serviceNow, template, validation, knowledge, cockpit)
                 .build();
     }
 }

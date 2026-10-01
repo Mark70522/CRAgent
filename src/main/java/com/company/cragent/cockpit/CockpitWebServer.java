@@ -2,11 +2,7 @@ package com.company.cragent.cockpit;
 
 import com.company.cragent.cockpit.CockpitModel.*;
 import com.company.cragent.config.CockpitProperties;
-import com.company.cragent.history.HistoryStore;
-import com.company.cragent.model.ChangeRecord;
-import com.company.cragent.model.Violation;
-import com.company.cragent.servicenow.ServiceNowGateway;
-import com.company.cragent.validation.RuleEngine;
+import com.company.cragent.tools.ServiceNowTools;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
@@ -43,19 +39,14 @@ public class CockpitWebServer {
     private final CockpitStore store;
     private final CockpitProperties props;
     private final ObjectMapper json;
-    private final ServiceNowGateway sn;
-    private final RuleEngine rules;
-    private final HistoryStore history;
+    private final ServiceNowTools sn;
     private HttpServer server;
 
-    public CockpitWebServer(CockpitStore store, CockpitProperties props, ObjectMapper json,
-                            ServiceNowGateway sn, RuleEngine rules, HistoryStore history) {
+    public CockpitWebServer(CockpitStore store, CockpitProperties props, ObjectMapper json, ServiceNowTools sn) {
         this.store = store;
         this.props = props;
         this.json = json;
         this.sn = sn;
-        this.rules = rules;
-        this.history = history;
     }
 
     @PostConstruct
@@ -88,18 +79,8 @@ public class CockpitWebServer {
                 String number = query(ex).getOrDefault("number", "").trim();
                 if (number.isEmpty()) { respondJson(ex, Map.of("error", "number is required")); return; }
                 try {
-                    ChangeRecord r = sn.getChange(number);
-                    List<Violation> v = rules.validate(r.fields(), r.tasks());
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("change", r);
-                    m.put("violations", v);
-                    m.put("passed", v.stream().noneMatch(x -> "error".equalsIgnoreCase(x.severity())));
-                    m.put("similar", history.findSimilar(r.field("cmdb_ci"), r.field("type"), null, true, 4).stream()
-                            .filter(s -> !number.equalsIgnoreCase(s.number()))
-                            .map(s -> Map.of("number", s.number(), "short_description", String.valueOf(s.field("short_description")),
-                                    "start_date", String.valueOf(s.field("start_date")), "approval", String.valueOf(s.field("approval"))))
-                            .collect(Collectors.toList()));
-                    m.put("instanceUrl", sn.instanceUrl());
+                    Map<String, Object> m = new LinkedHashMap<>(sn.getChange(number));
+                    m.put("number", number);
                     respondJson(ex, m);
                 } catch (Exception e) {
                     respondJson(ex, Map.of("error", String.valueOf(e.getMessage())));

@@ -15,26 +15,24 @@ class TemplateServiceTest {
 
     @Test
     void listsAllTemplates() {
-        assertThat(service.listTemplates()).extracting(ChangeTemplate::name)
-                .contains("os-patch", "db-patch", "app-release");
+        assertThat(service.listTemplates()).extracting(ChangeTemplate::name).contains("os-patch", "db-patch", "app-release");
     }
 
     @Test
     void buildsTaskTimelineBackToBack() {
-        CiInfo ci = new CiInfo("x", "srv-app-01", "10.0.1.11", "win", "Windows", "prod", "Wintel Ops", "Order Portal", "Sat 02:00-06:00");
-        ChangeDraft d = service.buildDraft(service.getTemplate("os-patch"), List.of(ci), "2026-10-10 02:00:00", "2026-10 Windows patches");
+        CiInfo ci = new CiInfo("x", "srv-app-01", "10.0.1.11", "server", "Windows", "prod", "Wintel Ops", "Order Portal", "Sun 00:00-06:00");
+        ChangeDraft d = service.buildDraft(service.getTemplate("os-patch"), List.of(ci), "2026-10-11 01:00:00", "2026-10 Windows patches");
 
-        assertThat(d.shortDescription()).isEqualTo("[PATCH] srv-app-01 - 2026-10 Windows patches");
-        assertThat(d.assignmentGroup()).isEqualTo("Wintel Ops");
-        assertThat(d.plannedStart()).isEqualTo("2026-10-10 02:00:00");
-        assertThat(d.plannedEnd()).isEqualTo("2026-10-10 06:00:00");
+        assertThat(d.fields().get("short_description")).isEqualTo("[PATCH] srv-app-01 - 2026-10 Windows patches");
+        assertThat(d.fields().get("type")).isEqualTo("normal");
+        assertThat(d.fields().get("start_date")).isEqualTo("2026-10-11 01:00:00");
+        assertThat(d.fields().get("end_date")).isEqualTo("2026-10-11 05:00:00");
+        assertThat(String.valueOf(d.fields().get("description"))).contains("<TODO:");
         assertThat(d.tasks()).hasSize(4);
-        assertThat(d.tasks().get(0).plannedStart()).isEqualTo("2026-10-10 02:00:00");
-        assertThat(d.tasks().get(0).plannedEnd()).isEqualTo("2026-10-10 02:30:00");
-        assertThat(d.tasks().get(1).plannedStart()).isEqualTo("2026-10-10 02:30:00");
-        assertThat(d.tasks().get(3).plannedEnd()).isEqualTo("2026-10-10 05:30:00");
-        assertThat(d.tasks().get(0).assignmentGroup()).isEqualTo("Wintel Ops");
-        assertThat(d.description()).contains("1. 变更对象").contains("<TODO:");
-        assertThat(d.type()).isEqualTo("normal");
+        assertThat(d.tasks().get(0).get("planned_start_date")).isEqualTo("2026-10-11 01:00:00");
+        assertThat(d.tasks().get(0).get("planned_end_date")).isEqualTo("2026-10-11 01:30:00");
+        assertThat(d.tasks().get(0).get("assignment_group")).isEqualTo("Wintel Ops");
+        assertThat(d.tasks().get(3).get("planned_end_date")).isEqualTo("2026-10-11 04:30:00");
+        assertThat(d.tasksAsText().get(0).get("order")).isEqualTo("10");
     }
 }

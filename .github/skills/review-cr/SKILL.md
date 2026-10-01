@@ -1,6 +1,6 @@
 ---
 name: review-cr
-description: Review an existing ServiceNow change request (by CHG number) or a draft against the hard and soft rules, report each violation with a concrete fix, and optionally apply the fixes. Use when the user asks to review / check / audit / fix a CR, or says a CR was rejected.
+description: Review an existing change request (by number) or a draft against the hard and soft rules, report each violation with a concrete fix. Use when the user asks to review / check / audit a CR, or says a CR was rejected.
 ---
 
 # review-cr
@@ -8,32 +8,24 @@ description: Review an existing ServiceNow change request (by CHG number) or a d
 ## 1. Load
 
 1. `read_rules`.
-2. `get_change` for the number (or use the draft the user pasted).
-3. `find_similar_changes` for the same CI/type, 2 approved examples, to compare the level of detail.
+2. `get_change` for the number (returns fields, tasks and the hard-rule result), or use the pasted draft.
+3. If `search-changes` is configured: two approved examples for the same server, to compare detail.
 
 ## 2. Check
 
-1. `validate_change` (or `validate_draft`) – hard rules.
+1. Hard-rule violations from `get_change` / `validate_draft`.
 2. Read the change against every soft rule.
-3. Compare with the approved examples: is anything present there and missing here (patch list,
-   business confirmation, rollback time, validation owner, task granularity)?
+3. Compare with the examples: what do they have that this one lacks (patch list, business confirmation,
+   rollback time, validation owner, task granularity)?
 
 ## 3. Report
 
-One table: rule id | severity | field | problem | proposed fix (the actual replacement text, not "improve").
-Then a verdict: ready to submit / needs the fixes above.
+One table: rule id | severity | field | problem | proposed fix (the actual replacement text).
+Then a verdict: ready to submit / needs the fixes above. Changing the record in ServiceNow is done
+by the user unless an update endpoint is configured; then call it with `sn_call` only after confirmation.
 
-## 4. Apply (only if the user asks)
+## 4. Learn from a rejection
 
-- `update_change` with the corrected fields, `add_change_tasks` if tasks are missing.
-- Re-run `validate_change` and show the result.
-
-## 5. Learn from a rejection
-
-If the user says the change was rejected, ask for (or read from the approvals) the rejection reason, then:
-
-1. `save_rejected` with the reason.
-2. For each reason, decide whether it is already covered by a rule. If not, propose a new rule
-   (hard if it can be checked mechanically, otherwise soft) and, once the user agrees, add it with
-   `add_hard_rule` / `add_soft_rule`.
-3. Fix the change (step 4) so it can be resubmitted.
+If the user says it was rejected: ask for the reason, `save_rejected`, then for each reason decide
+whether a rule already covers it; if not, propose one (hard if checkable, else soft) and add it with
+`add_hard_rule` / `add_soft_rule` once the user agrees.

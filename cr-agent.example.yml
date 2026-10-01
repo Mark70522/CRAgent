@@ -1,96 +1,65 @@
 # ============================================================================
-#  cr-agent 唯一需要改的配置文件
-#
-#  复制成 cr-agent.yml (已在 .gitignore 里, 不会被提交), 按你们的实例填。
-#  本机测试: 保持 mock: true, 其他都不用填。
+#  cr-agent 唯一要改的配置文件。复制成 cr-agent.yml(已 gitignore),按你们的情况填。
+#  密码 / token 不写在这里: 用环境变量 SN_TOKEN 或 SN_PASSWORD(setx 后重启 IntelliJ)。
 # ============================================================================
 
-# ---- 日课驾驶舱 (任务 + 早晚仪式 + 知识沉淀), 数据全在 cockpit/ 目录 ----
-cockpit:
-  dir: ./cockpit
-  port: 7777            # 页面地址 http://127.0.0.1:7777/
-  web: true             # false = 不起页面, 只留 Copilot 工具
+servicenow:
+  base-url: https://sn-gateway.company.internal        # 你们接口的根地址
+  auth:
+    type: bearer                 # bearer | basic | none
+    token-env: SN_TOKEN          # bearer: 从哪个环境变量读 token
+    # type: basic
+    # user: svc_cr_agent
+    # password-env: SN_PASSWORD
+  # headers:                     # 每个请求都带的额外头, 比如网关 key
+  #   X-Api-Key: "..."
+  # proxy-host: proxy.company.com
+  # proxy-port: 8080
+
+  # ---- 你们的接口, 有几个写几个。程序只认三个名字: get-change / create-change / search-changes,
+  #      其他名字的接口 Copilot 可以用 sn_call 调。
+  #      ${xxx} 是占位符, 来自调用时的参数: path / query 里按文本替换, body 里按 JSON 替换。
+  #      result 是返回 JSON 里记录所在的位置(点分隔), 空 = 整个返回。
+  endpoints:
+    get-change:
+      method: GET
+      path: /change/${number}
+      result: data               # 比如返回 {"data": {...}} 就写 data
+      tasks: tasks               # 记录里 task 列表所在的键(可选, 给页面和校验用)
+      description: 按单号读一张 CR
+    create-change:
+      method: POST
+      path: /change
+      # body 不写 = 把草稿字段平铺成 JSON 发出去。接口有外层包装就写模板, 例如:
+      # body: '{"request": ${fields}, "tasks": ${tasks}}'
+      result: data
+      description: 创建 CR, 返回新单
+    search-changes:              # 可选。没有就删掉, create-cr 会跳过"看相似历史"这一步
+      method: GET
+      path: /change
+      query:
+        ci: "${ci}"
+        status: closed
+        limit: "${limit}"
+      result: data.items
+      description: 按服务器查历史 CR
 
 # ---- 服务器清单: 你们的 Excel ----
 inventory:
-  file: ./knowledge/inventory.xlsx      # 也支持 .csv; 留空则改查 ServiceNow CMDB
-  sheet: ""                             # 空 = 第一个 sheet
-  maintenance-window: "Sun 00:00-06:00" # 表里没填窗口的服务器用这个 (只是展示; 真正的检查在 hard-rules.yaml HR-018)
-  columns:                              # 表头叫什么就写什么 (不分大小写, 空格/下划线随意)
+  file: ./knowledge/inventory.xlsx     # 也支持 .csv
+  sheet: ""                            # 空 = 第一个 sheet
+  maintenance-window: "Sun 00:00-06:00"
+  columns:                             # 表头叫什么就写什么(不分大小写, 空格/下划线随意)
     service: Service
     environment: Environment
     server: Server
-    ip: IP                              # 下面四列可选, 表里没有就删掉这行
+    ip: IP                             # 下面四列可选
     os: OS
     owner-group: Owner Group
     maintenance-window: Maintenance Window
 
-servicenow:
-  # true  = 内存假实例, 本机开发/演示用, 不需要网络
-  # false = 连公司 ServiceNow
-  mock: true
-
-  # ---- 接公司实例时填下面这些 ----
-  instance: https://company.service-now.com
-  user: svc_cr_agent
-  # !! 密码/token 不要写在这个文件里: 它在工作区内, Copilot 能读到工作区里的任何文件。
-  # 放工作区外面, 二选一 (设完重启 VS Code):
-  #   1. 环境变量:  setx SERVICENOW_PASSWORD "你的密码"   或   setx SERVICENOW_TOKEN "..."
-  #   2. 外部文件:  %USERPROFILE%\.cr-agent\cr-agent.yml (同格式, 只写 servicenow.password 或 token);
-  #                想放别的路径就设环境变量 CR_AGENT_CONFIG 指过去
-  # 优先级: 这个文件 < 外部文件 < 环境变量
-
-  # ---- 下面两项只在 inventory.file 留空、改查 CMDB 时才用 ----
-  ci-table: cmdb_ci_server
-  ci-fields:
-    name: name
-    ip-address: ip_address
-    os: os
-    environment: u_environment            # prod / uat / dev 存在哪一列
-    owner-group: support_group            # 负责组
-    business-app: u_business_application  # 所属业务应用
-    maintenance-schedule: maintenance_schedule
-
-  # 同步历史时只拉这些状态的 CR (标准 ITSM: 3=Closed 4=Canceled 7=Closed 其他 -4=Canceled)
-  closed-states: "3,4,7,-4"
-
-  # ---- 公司接口和标准 Table API 不一样时改这里 (全部可选, 不写 = 标准值) ----
-  # 先在 Copilot 里用 sn_raw_get 看真实返回, 再对着填; sn_config 能看当前生效的配置。
-  # adapter: table-api          # 接口形状完全不同时, 写一个新的 ServiceNowGateway 实现并在这里选它 (见 README)
-  api:
-    base-path: /api/now/table   # 公司包了网关的话改成网关路径, 如 /api/x_acme/itsm/v1
-    result-path: result         # 返回 JSON 里记录数组所在的键, 多层用点: data.items
-    record-path: result         # POST/PATCH 返回的那条记录所在的键
-    # headers:                  # 每个请求都带的额外头, 比如网关的 API key
-    #   X-Api-Key: "..."
-    # default-params:           # 每个请求都带的额外参数
-    #   sysparm_display_value: "true"
-    tables:
-      change: change_request
-      task: change_task
-      approval: sysapproval_approver
-      journal: sys_journal_field
-    # 列名映射: 左边是程序 / 规则 / 模板用的逻辑名, 右边是你们实例的真实列名。只写不一样的。
-    change-fields:
-      # backout_plan: u_rollback_plan
-      # justification: u_business_justification
-    task-fields:
-      # planned_start_date: u_planned_start
-    task-link-field: change_request   # task 表上指向 CR 的列
-    task-order-field: order
-    approval:
-      # {since} 和 {sys_id} 会被替换
-      rejected-query: "state=rejected^source_table=change_request^sys_updated_on>={since}^ORDERBYDESCsys_updated_on"
-      by-change-query: "sysapproval={sys_id}^ORDERBYsys_updated_on"
-      link-field: sysapproval
-      fields: [sysapproval, approver, state, comments, sys_updated_on]
-      # field-map:              # 真实列名 -> 程序期望的名字 (approver / state / comments / sys_updated_on)
-      #   u_reviewer: approver
-      #   u_remarks: comments
-    journal:
-      by-change-query: "element_id={sys_id}^ORDERBYsys_created_on"
-      fields: [element, value, sys_created_on, sys_created_by]
-
-  # 走代理时打开
-  # proxy-host: proxy.company.com
-  # proxy-port: 8080
+# ---- 日课驾驶舱 ----
+cockpit:
+  dir: ./cockpit
+  port: 7777
+  web: true                            # false = 不起页面
