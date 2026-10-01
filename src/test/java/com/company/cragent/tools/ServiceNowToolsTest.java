@@ -1,0 +1,98 @@
+package com.company.cragent.tools;
+
+import com.company.cragent.model.ChangeDraft;
+import com.company.cragent.model.ChangeRecord;
+import com.company.cragent.servicenow.ServiceNowClient;
+import com.company.cragent.validation.RuleEngine;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/**
+ * The guards around the three ServiceNow operations, exercised with an in-memory ServiceNowClient that
+ * lives only in this test. It records what it was asked to do; it is not sample data.
+ */
+class ServiceNowToolsTest {
+
+    /** Minimal in-test client: remembers calls, returns what it was given. */
+    static class RecordingClient implements ServiceNowClient {
+        final List<String> calls = new ArrayList<>();
+        final Map<String, Map<String, String>> store = new HashMap<>();
+        public ChangeRecord getChange(String number) {
+            calls.add("get " + number);
+            Map<String, String> f = store.get(number);
+            if (f == null) throw new com.company.cragent.servicenow.ServiceNowException("not found: " + number);
+            return new ChangeRecord(number, f, List.of(), new ObjectMapper().valueToTree(f));
+        }
+        public ChangeRecord createChange(ChangeDraft draft) {
+            calls.add("create " + draft.fields().get("short_description"));
+            Map<String, String> f = new LinkedHashMap<>(draft.fieldsAsText());
+            f.put("number", "CHG0099");
+            store.put("CHG0099", f);
+            return new ChangeRecord("CHG0099", f, draft.tasksAsText(), new ObjectMapper().valueToTree(f));
+        }
+        public ChangeRecord updateChange(String number, Map<String, Object> fields) {
+            calls.add("update " + number + " " + fields);
+            Map<String, String> f = store.get(number);
+            fields.forEach((k, v) -> f.put(k, String.valueOf(v)));
+            return new ChangeRecord(number, f, List.of(), new ObjectMapper().valueToTree(f));
+        }
+        public String describe() { return "recording client"; }
+    }
+
+    final RecordingClient client = new RecordingClient();
+    final ServiceNowTools tools = new ServiceNowTools(client, new RuleEngine(Path.of("knowledge/rules/hard-rules.yaml")));
+
+    static ChangeDraft goodDraft() {
+        Map<String, Object> f = new LinkedHashMap<>();
+        f.put("short_description", "[PATCH] srv-app-01 - 2026-10 Windows monthly security patches");
+        f.put("description", "1. 变更对象\nsrv-app-01 (prod, Windows Server 2019, Order Portal application server)\n\n2. 补丁清单及来源\n2026-10 Microsoft monthly security baseline from WSUS\n\n3. 影响范围\nOrder Portal front end unavailable for about 45 minutes, business owner informed\n\n4. 执行步骤\nsee change tasks: snapshot, patch, reboot, validate\n\n5. 验证方法\nIIS returns 200, health check OK, no critical events\n\n6. 回退方案\nrestore the VMware snapshot, about 20 minutes, rehearsed last month");
+        f.put("type", "normal"); f.put("risk", "Moderate"); f.put("cmdb_ci", "srv-app-01"); f.put("assignment_group", "Wintel Ops");
+        f.put("start_date", "2026-10-11 01:00:00"); f.put("end_date", "2026-10-11 05:00:00");
+        f.put("justification", "Security compliance"); f.put("implementation_plan", "See tasks");
+        f.put("backout_plan", "Restore snapshot, 20 min"); f.put("test_plan", "Health checks");
+        List<Map<String, Object>> tasks = List.of(
+                Map.of("short_description", "Pre-check", "order", "10", "assignment_group", "Wintel Ops", "planned_start_date", "2026-10-11 01:00:00", "planned_end_date", "2026-10-11 01:30:00"),
+                Map.of("short_description", "Patch", "order", "20", "assignment_group", "Wintel Ops", "planned_start_date", "2026-10-11 01:30:00", "planned_end_date", "2026-10-11 03:30:00"));
+        return new ChangeDraft(f, tasks);
+    }
+
+    @Test
+    void createRefusesWithoutConfirmationAndWithRuleErrors() {
+        assertThatThrownBy(() -> tools.createChange(goodDraft(), false)).hasMessageContaining("confirmation");
+        ChangeDraft bad = goodDraft();
+        bad.fields().put("short_description", "patch servers");
+        assertThatThrownBy(() -> tools.createChange(bad, true)).hasMessageContaining("hard-rule error");
+        assertThat(client.calls).isEmpty();
+    }
+
+    @Test
+    void createThenReadThenUpdate() {
+        Map<String, Object> created = tools.createChange(goodDraft(), true);
+        assertThat(created.get("number")).isEqualTo("CHG0099");
+        assertThat((Boolean) created.get("passed")).isTrue();
+
+        Map<String, Object> read = tools.getChange("CHG0099");
+        assertThat(read.get("number")).isEqualTo("CHG0099");
+
+        assertThatThrownBy(() -> tools.updateChange("CHG0099", Map.of("risk", "High"), false)).hasMessageContaining("confirmation");
+        Map<String, Object> updated = tools.updateChange("CHG0099", Map.of("risk", "High"), true);
+        @SuppressWarnings("unchecked") Map<String, String> f = (Map<String, String>) updated.get("fields");
+        assertThat(f).containsEntry("risk", "High");
+        assertThat(client.calls).containsExactly("create [PATCH] srv-app-01 - 2026-10 Windows monthly security patches", "get CHG0099", "update CHG0099 {risk=High}");
+    }
+
+    @Test
+    void readErrorsAreNotSwallowed() {
+        assertThatThrownBy(() -> tools.getChange("CHG0000")).hasMessageContaining("not found: CHG0000");
+    }
+}

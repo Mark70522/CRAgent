@@ -52,7 +52,7 @@ class EndpointClientTest {
 
     static EndpointClient client(Auth auth, Map<String, Endpoint> endpoints) {
         String base = "http://127.0.0.1:" + server.getAddress().getPort();
-        return new EndpointClient(new ServiceNowProperties(base, auth, Map.of("X-Api-Key", "k1"), null, null, 5000, endpoints), new ObjectMapper());
+        return new EndpointClient(new ServiceNowProperties(base, auth, Map.of("X-Api-Key", "k1"), null, null, 5000, "yaml", endpoints), new ObjectMapper());
     }
 
     @Test
@@ -76,8 +76,8 @@ class EndpointClientTest {
 
         JsonNode items = c.call("list", Map.of());
         assertThat(items.isArray()).isTrue();
-        assertThat(c.flattenList(items)).hasSize(2);
-        assertThat(c.flatten(rec)).containsEntry("short_description", "hello").containsKey("tasks");
+        assertThat(SnHttp.flattenList(items)).hasSize(2);
+        assertThat(SnHttp.flatten(rec)).containsEntry("short_description", "hello").containsKey("tasks");
     }
 
     @Test

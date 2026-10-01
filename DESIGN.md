@@ -8,7 +8,9 @@ IntelliJ + GitHub Copilot(Agent 模式)
    ▼
 cr-agent(一个 Java 进程,Spring Boot 3.5 + Spring AI MCP,stdio)
    ├── 变更单
-   │     EndpointClient  ──► 你在 cr-agent.yml 里描述的接口(唯一碰 ServiceNow 的代码)
+   │     ServiceNowClient 接口(读 / 建 / 改三个方法)
+   │       ├── YamlServiceNowClient   按 cr-agent.yml 里的 endpoints 描述调(默认)
+   │       └── CompanyServiceNowClient 你自己实现,SnHttp 提供认证和 HTTP
    │     TemplateService     模板 → 草稿(字段名 = 你们接口的名字)
    │     RuleEngine          hard-rules.yaml 机器校验
    │     Inventory           Excel 服务器清单
@@ -27,7 +29,7 @@ cr-agent(一个 Java 进程,Spring Boot 3.5 + Spring AI MCP,stdio)
 3. **规则是文件。** 硬规则 yaml(必填、枚举、正则、长度、时间顺序、task 数量、窗口)每次校验重读;软规则 md 由 Copilot 判断。老板的要求落在文件里,有 changelog。
 4. **每个事实有来源。** 草稿字段标注来自清单、模板、历史还是用户;没有来源的留空问人。
 5. **写操作有闸。** 创建必须 `confirmed=true` 且硬规则无 error;只创建,提交审批是人。
-6. **没有 mock。** 本地测试用单元测试(接口描述语言用本地 HttpServer 回放验证),真实数据只在公司。
+6. **没有 mock 数据。** 主代码里没有任何假数据;单元测试用本地 HttpServer 回放和测试内的内存实现验证逻辑,真实数据只在公司。
 
 ## 变更单流程(create-cr)
 
@@ -81,7 +83,7 @@ create-change 的 body:不写模板 = 草稿字段平铺;写模板可用 `${fiel
 ```
 src/main/java/com/company/cragent/
 ├── config/        ServiceNowProperties(接口描述) InventoryProperties KnowledgeProperties CockpitProperties McpToolConfig
-├── servicenow/    EndpointClient ServiceNowException
+├── servicenow/    ServiceNowClient(接口) YamlServiceNowClient CompanyServiceNowClient(你填) SnHttp(认证/HTTP/JSON) EndpointClient(yml 描述执行器) ServiceNowException
 ├── inventory/     Inventory(Excel/CSV)
 ├── template/      ChangeTemplate TemplateService
 ├── validation/    HardRule RuleEngine

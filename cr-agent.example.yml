@@ -4,6 +4,10 @@
 # ============================================================================
 
 servicenow:
+  # 两种实现, 二选一:
+  #   yaml    = 不写 Java, 下面 endpoints 里描述三个接口(默认)
+  #   company = 自己在 CompanyServiceNowClient.java 里实现三个方法(认证、HTTP、报错已经做好)
+  client: yaml
   base-url: https://sn-gateway.company.internal        # 你们接口的根地址
   auth:
     type: bearer                 # bearer | basic | none

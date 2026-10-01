@@ -31,7 +31,11 @@ public record ServiceNowProperties(
         String proxyHost,
         Integer proxyPort,
         Integer timeoutMs,
+        /** yaml (default: endpoints described below) or company (your CompanyServiceNowClient). */
+        String client,
         Map<String, Endpoint> endpoints) {
+
+    public String client() { return client == null || client.isBlank() ? "yaml" : client.trim().toLowerCase(); }
 
     public record Auth(String type, String tokenEnv, String token, String user, String passwordEnv, String password) {
         public String type() { return type == null || type.isBlank() ? "none" : type.trim().toLowerCase(); }

@@ -52,7 +52,18 @@ servicenow:
     update-change: { method: PATCH, path: /change/${number}, result: data }
 ```
 
-只有这三个接口:读、建、改。对应三个工具 `get_change`、`create_change`、`update_change`;建和改都要你确认才发。规则:
+只有这三个接口:读、建、改。对应三个工具 `get_change`、`create_change`、`update_change`;建和改都要你确认才发。
+
+接口怎么实现,二选一(`servicenow.client`):
+
+| `client:` | 怎么做 | 适合 |
+|---|---|---|
+| `yaml`(默认) | 上面那样在 yml 里描述,不写 Java | 接口是普通 HTTP + JSON |
+| `company` | 打开 `src/.../servicenow/CompanyServiceNowClient.java`,填三个 TODO 方法 | 接口有特殊逻辑,或你想自己掌控 |
+
+`company` 模式下认证、HTTP、JSON、报错都已经在 `SnHttp` 里做好,每个方法只需三行:调哪个路径、记录在返回的哪里、组装成 `ChangeRecord`。文件里有示例代码。三个方法的契约在 `ServiceNowClient.java`。
+
+yaml 模式的规则:
 
 | 键 | 意思 |
 |---|---|
