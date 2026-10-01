@@ -97,6 +97,7 @@ yaml 模式的规则:
 | `用 create-cr skill,给 Order Portal 的 prod 打十月补丁,周日 1 点` | 查清单 → 看范例 → 套模板 → 填描述 → 校验 → 给你确认 → 调 create-change |
 | `审一下 CHG0012345` | 逐条规则给出问题和改法;你说"改"它才调 update-change |
 | `被打回了,理由是 …` | 存档、提炼规则问你要不要加 |
+| `早` | 一个字就够:Copilot 自动拉起 cr-agent,把驾驶舱页面弹到浏览器,读昨天和在等的,给你今天三件事 |
 | `早安` / `记成任务` / `记一笔` / `收工` | 驾驶舱的早晚流程,见 `.github/skills/` |
 | `T-0003 等 CAB 审批` / `批了` | 任务进入「等待中」,早安时单独列出不再催;说"批了"回到待办 |
 | `T-0003 周日凌晨 1 点执行` | 记下执行时间;执行前两天早安会提醒检查变更单和审批,过了没标完成会问你跑了没 |
@@ -116,7 +117,7 @@ yaml 模式的规则:
 
 | 只读,可以自动批准 | 会写东西,保留确认 |
 |---|---|
-| `status` `get_change` `lookup_ci` `lookup_service` `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` `read_rules` `list_examples` `read_example` `eval_rules` `get_day` `list_tasks` `task_notes` `task_history` `search_knowledge` `read_knowledge` `cockpit_url` | `create_change` `update_change`(代码里还要 confirmed=true)· `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` · `add_tasks` `update_task` `plan_day` `capture_note` `close_day` `save_knowledge` |
+| `status` `get_change` `lookup_ci` `lookup_service` `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` `read_rules` `list_examples` `read_example` `eval_rules` `get_day` `list_tasks` `task_notes` `task_history` `search_knowledge` `read_knowledge` `cockpit_url` `open_cockpit` | `create_change` `update_change`(代码里还要 confirmed=true)· `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` · `add_tasks` `update_task` `plan_day` `capture_note` `close_day` `save_knowledge` |
 
 **健康检查**:在 Copilot 里说 `status`,或命令行 `java scripts/CallTool.java status`,一次看到接口、清单、规则、范例、回归结果、页面地址、审计日志位置。
 

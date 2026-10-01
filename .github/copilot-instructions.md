@@ -17,4 +17,6 @@ Ground rules, always:
 - `read_rules` before drafting or reviewing. Hard rules are enforced by `validate_draft`; soft rules you check.
 - Daily tasks: skills `morning-brief`, `capture`, `evening-close`. Answers about the user's past come only
   from `search_knowledge` / `task_notes` / `task_history`, with the file named.
+- A message that is just `早` / `早安` / `开工` means: run `morning-brief` now (it opens the cockpit page
+  itself). `收工` / `下班` means `evening-close`. Do not ask for clarification on these.
 - Reply in the user's language. Times are `yyyy-MM-dd HH:mm:ss`.

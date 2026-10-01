@@ -1,14 +1,16 @@
 ---
 name: morning-brief
-description: Start the day. When the user says 早安 / 开工 / good morning / start my day, read yesterday's leftovers, open tasks, what is waiting or scheduled, and relevant knowledge; propose the three things that matter today with reasons, lay out a timeline, and after confirmation write the plan with plan_day.
+description: Start the day. When the user says 早 / 早安 / 早上好 / 开工 / morning / good morning / start my day (a bare 早 is enough), open the cockpit page, read yesterday's leftovers, open tasks, what is waiting or scheduled, and relevant knowledge; propose the three things that matter today with reasons, lay out a timeline, and after confirmation write the plan with plan_day.
 ---
 
 # morning-brief
 
 Goal: in two minutes the user knows what today is for, what is merely being watched, and the plan is written down.
+A single word from the user ("早") is the whole trigger: do not ask what they mean, start.
 
 ## 1. Read
 
+0. `open_cockpit` (view morning) so the page is on screen while you work. Once; never again in the same brief.
 1. `get_day` (today). It returns: today's file (may be empty), carried-over tasks, all open tasks,
    `attention` (waiting / scheduled / overdueRun / withChange), the previous day's file (summary,
    tomorrow list, notes), the last 7 days' stats and the knowledge topics.

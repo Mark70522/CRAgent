@@ -593,8 +593,12 @@ table.cr-t td.num{white-space:nowrap}
     }); }, 250);
   });
 
+  // #morning / #day / #evening / #history / #knowledge / #change in the URL wins (open_cockpit uses it), else the last view
   var v = 'morning'; try { v = localStorage.getItem('cockpit-view') || 'morning'; } catch(e){}
+  var hv = (location.hash || '').slice(1);
+  if (['morning','day','evening','history','knowledge','change'].indexOf(hv) >= 0) v = hv;
   show(v);
+  window.addEventListener('hashchange', function(){ var h = (location.hash||'').slice(1); if (['morning','day','evening','history','knowledge','change'].indexOf(h) >= 0) show(h); });
   load().catch(function(){ document.getElementById('brief').innerHTML = '<div class="empty">连不上本地服务,确认 MCP server 在跑。</div>'; });
   setInterval(function(){ if (!document.hidden) load(); }, 20000);
 })();

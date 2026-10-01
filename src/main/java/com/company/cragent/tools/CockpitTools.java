@@ -224,4 +224,23 @@ public class CockpitTools {
     public String url() {
         return props.webEnabled() ? "http://127.0.0.1:" + props.portNumber() + "/" : "(cockpit web page is disabled: cockpit.web=false)";
     }
+
+    @Tool(name = "open_cockpit", description = """
+            Open the cockpit page in the user's default browser (local page, nothing leaves the machine).
+            Call it once at the start of the morning brief and whenever the user asks to see the page.
+            view: morning | day | evening | history | knowledge | change (default morning).""")
+    public String openCockpit(@ToolParam(description = "Which view to open, default morning", required = false) String view) {
+        if (!props.webEnabled()) return "(cockpit web page is disabled: cockpit.web=false)";
+        String v = view == null || view.isBlank() ? "morning" : view.trim().toLowerCase();
+        String url = url() + "#" + v;
+        try {
+            String os = System.getProperty("os.name", "").toLowerCase();
+            List<String> cmd = os.contains("win") ? List.of("rundll32", "url.dll,FileProtocolHandler", url)
+                    : os.contains("mac") ? List.of("open", url) : List.of("xdg-open", url);
+            new ProcessBuilder(cmd).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+            return "opened " + url;
+        } catch (Exception e) {
+            return "could not open a browser (" + e.getMessage() + "); open " + url + " by hand";
+        }
+    }
 }
