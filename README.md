@@ -99,9 +99,23 @@ yaml 模式的规则:
 
 ---
 
-## 5. 到公司后的顺序
+## 5. 让它可控:评测、审计、授权分级
 
-1. `cr-agent.yml` 填 `base-url`、认证、`get-change` 一个接口。`java scripts/CallTool.java get_change "{\"number\":\"真实单号\"}"`,返回和页面上一致就通了。
+**规则回归(评测集)**:`knowledge/examples/` 和 `knowledge/rejected/` 里的 YAML 既是 Copilot 的写作范例,也是规则的测试集。过审的单不能被任何硬规则误伤,打回的单必须被抓到。`mvn test` 自动跑;Copilot 加规则时自动跑并把结果告诉你;随时可以说"跑一下 eval_rules"。过审的好单说"把 CHG… 存成范例",打回的说"CHG… 被打回了,理由是…",它就归档进去了。
+
+**审计日志**:`logs/audit.jsonl`,每次工具调用和页面操作一行:时间、来源(copilot / page)、动作、参数、成败、耗时。查"上周二它对 ServiceNow 做了什么"不用翻聊天记录。
+
+**工具按风险分级**:Copilot 默认每个工具调用都弹确认。在工具面板里把只读工具设成 Always allow,写操作保留确认:
+
+| 只读,可以自动批准 | 会写东西,保留确认 |
+|---|---|
+| `status` `get_change` `lookup_ci` `lookup_service` `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` `read_rules` `list_examples` `read_example` `eval_rules` `get_day` `list_tasks` `task_notes` `task_history` `search_knowledge` `read_knowledge` `cockpit_url` | `create_change` `update_change`(代码里还要 confirmed=true)· `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` · `add_tasks` `update_task` `plan_day` `capture_note` `close_day` `save_knowledge` |
+
+**健康检查**:在 Copilot 里说 `status`,或命令行 `java scripts/CallTool.java status`,一次看到接口、清单、规则、范例、回归结果、页面地址、审计日志位置。
+
+## 6. 到公司后的顺序
+
+1. `cr-agent.yml` 填 `base-url`、认证、`get-change` 一个接口。`java scripts/CallTool.java status` 看配置读到没有,再 `java scripts/CallTool.java get_change "{\"number\":\"真实单号\"}"`,返回和页面上一致就通了。
 2. 页面「变更单」里看同一张单,底部"接口原始返回"告诉你字段叫什么;对着改模板的键名和规则的 `field`。
 3. 配 `create-change` 和 `update-change`,账号先只给读权限,跑 create-cr 看草稿;满意了再给写权限。
 4. 过审的好单用 `save_example` 存进 `knowledge/examples/`,以后的草稿照着写。

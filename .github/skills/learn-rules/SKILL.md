@@ -30,5 +30,7 @@ Rules live in files, not in the model. This skill turns evidence into entries th
 
 ## Quality bar
 
-One rule, one check. The description must make sense without reading the YAML. After adding a hard rule,
-`validate_change` on a couple of approved examples; soften or drop it if they fail.
+One rule, one check. The description must make sense without reading the YAML. `add_hard_rule` runs the
+regression (`eval_rules`) and returns it: an approved example failing means the rule is too strict - soften
+it or mark the example outdated; a rejected example no longer tripping means a rule was lost. Never leave
+the regression red.

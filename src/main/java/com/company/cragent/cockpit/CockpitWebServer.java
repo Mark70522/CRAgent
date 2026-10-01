@@ -2,6 +2,7 @@ package com.company.cragent.cockpit;
 
 import com.company.cragent.cockpit.CockpitModel.*;
 import com.company.cragent.config.CockpitProperties;
+import com.company.cragent.audit.AuditLog;
 import com.company.cragent.tools.ServiceNowTools;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,13 +41,15 @@ public class CockpitWebServer {
     private final CockpitProperties props;
     private final ObjectMapper json;
     private final ServiceNowTools sn;
+    private final AuditLog audit;
     private HttpServer server;
 
-    public CockpitWebServer(CockpitStore store, CockpitProperties props, ObjectMapper json, ServiceNowTools sn) {
+    public CockpitWebServer(CockpitStore store, CockpitProperties props, ObjectMapper json, ServiceNowTools sn, AuditLog audit) {
         this.store = store;
         this.props = props;
         this.json = json;
         this.sn = sn;
+        this.audit = audit;
     }
 
     @PostConstruct
@@ -133,10 +136,17 @@ public class CockpitWebServer {
 
     private void post(HttpExchange ex, Action action) throws IOException {
         if (!"POST".equalsIgnoreCase(ex.getRequestMethod())) { ex.sendResponseHeaders(405, -1); return; }
+        long t0 = System.currentTimeMillis();
+        String path = ex.getRequestURI().getPath();
+        String raw = "";
         try {
-            JsonNode body = json.readTree(ex.getRequestBody().readAllBytes());
-            respondJson(ex, action.apply(body == null ? json.createObjectNode() : body));
+            raw = new String(ex.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            JsonNode body = raw.isBlank() ? json.createObjectNode() : json.readTree(raw);
+            Object result = action.apply(body);
+            audit.record("page", path, raw, true, "", System.currentTimeMillis() - t0);
+            respondJson(ex, result);
         } catch (Exception e) {
+            audit.record("page", path, raw, false, String.valueOf(e.getMessage()), System.currentTimeMillis() - t0);
             byte[] b = json.writeValueAsBytes(Map.of("error", String.valueOf(e.getMessage())));
             ex.getResponseHeaders().add("Content-Type", "application/json; charset=utf-8");
             ex.sendResponseHeaders(400, b.length);

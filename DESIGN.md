@@ -62,14 +62,25 @@ create-change 的 body:不写模板 = 草稿字段平铺;写模板可用 `${fiel
 
 认证:`bearer`(`token-env`)、`basic`(`user` + `password-env`)、`none`;全局 `headers`;代理;超时。错误信息带 HTTP 状态和返回开头,不吞。
 
+## 让它可控的三件事
+
+| 机制 | 在哪 | 做什么 |
+|---|---|---|
+| 规则回归 | `knowledge/Regression` + `RegressionTest` + 工具 `eval_rules` | 过审范例必须 0 个 error,打回范例必须命中规则(含 `expected_rules`)。`mvn test` 把它当闸门;`add_hard_rule` / `save_*` 自动跑并返回结果 |
+| 审计日志 | `audit/AuditLog` + `AuditedToolCallback` | 每个 MCP 工具调用和页面 POST 一行 JSON 到 `logs/audit.jsonl`:时间、来源、动作、参数(截断)、成败、耗时 |
+| 授权分级 | README 第 5 节 | 只读工具在 Copilot 里 Always allow;写工具保留确认,且代码里 `confirmed=true` 再拦一道 |
+
+范例格式是 YAML(`ExampleStore`),同一份文件既给 Copilot 当写作范例,也给回归当测试用例。
+
 ## 工具清单
 
 | 组 | 工具 |
 |---|---|
-| ServiceNow | `sn_endpoints` `get_change` `create_change` `update_change`(建和改都要 confirmed=true) |
+| 状态 | `status`(接口、清单、规则、范例、回归、页面、审计一次看全) |
+| ServiceNow | `get_change` `create_change` `update_change`(建和改都要 confirmed=true) |
 | 清单 | `lookup_ci` `lookup_service` |
 | 模板 / 校验 | `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` |
-| 规则与范例 | `read_rules` `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` `list_examples` `read_example` |
+| 规则与范例 | `read_rules` `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` `list_examples` `read_example` `eval_rules` |
 | 驾驶舱 | `add_tasks` `list_tasks` `update_task` `task_notes` `get_day` `plan_day` `capture_note` `close_day` `save_knowledge` `read_knowledge` `search_knowledge` `task_history` `cockpit_url` |
 
 ## 日课驾驶舱
@@ -82,14 +93,16 @@ create-change 的 body:不写模板 = 草稿字段平铺;写模板可用 `${fiel
 
 ```
 src/main/java/com/company/cragent/
-├── config/        ServiceNowProperties(接口描述) InventoryProperties KnowledgeProperties CockpitProperties McpToolConfig
+├── config/        ServiceNowProperties(接口描述) InventoryProperties KnowledgeProperties CockpitProperties McpToolConfig(工具注册 + 审计包装)
+├── audit/         AuditLog AuditedToolCallback
+├── knowledge/     ExampleStore(YAML 范例) Regression(规则回归)
 ├── servicenow/    ServiceNowClient(接口) YamlServiceNowClient CompanyServiceNowClient(你填) SnHttp(认证/HTTP/JSON) EndpointClient(yml 描述执行器) ServiceNowException
 ├── inventory/     Inventory(Excel/CSV)
 ├── template/      ChangeTemplate TemplateService
 ├── validation/    HardRule RuleEngine
 ├── model/         ChangeDraft(fields + tasks 的 map) CiInfo Violation
 ├── cockpit/       CockpitModel CockpitStore CockpitWebServer
-└── tools/         ServiceNowTools InventoryTools TemplateTools ValidationTools KnowledgeTools CockpitTools
+└── tools/         StatusTools ServiceNowTools InventoryTools TemplateTools ValidationTools KnowledgeTools CockpitTools
 src/main/resources/static/cockpit.html   页面
 src/test/...                             EndpointClientTest(本地 HttpServer)RuleEngineTest TemplateServiceTest InventoryTest CockpitStoreTest
 ```

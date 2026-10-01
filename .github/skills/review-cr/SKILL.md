@@ -30,6 +30,8 @@ Show exactly which fields will change and the new text; after the user agrees, `
 
 ## 5. Learn from a rejection
 
-If the user says it was rejected: ask for the reason, `save_rejected`, then for each reason decide
-whether a rule already covers it; if not, propose one (hard if checkable, else soft) and add it with
-`add_hard_rule` / `add_soft_rule` once the user agrees.
+If the user says it was rejected: ask for the reason, then for each reason decide whether a rule already
+covers it. `save_rejected` with the reason and the ids of the rules that should catch it (expectedRules).
+Reasons no rule covers: propose one (hard if checkable, else soft) and add it with `add_hard_rule` /
+`add_soft_rule` once the user agrees. `add_hard_rule` returns the regression result: if an approved
+example now fails, the rule is too strict - adjust it before moving on.

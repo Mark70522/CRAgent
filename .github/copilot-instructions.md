@@ -4,9 +4,9 @@ This workspace is an agent for ServiceNow change requests (CRs) and for the user
 The MCP server `cr-agent` exposes the tools; the skills under `.github/skills/` define the workflows;
 `knowledge/` holds the rules, templates and examples that encode what the approvers expect.
 
-ServiceNow is reached only through three endpoints the user described in `cr-agent.yml`:
-`get_change`, `create_change`, `update_change` (`sn_endpoints` shows which are configured).
-Field names are whatever those endpoints expect; never rename them.
+ServiceNow is reached only through three operations the user wired up in `cr-agent.yml` or
+`CompanyServiceNowClient`: `get_change`, `create_change`, `update_change`. `status` shows what is configured.
+Field names are whatever that interface expects; never rename them.
 
 Ground rules, always:
 

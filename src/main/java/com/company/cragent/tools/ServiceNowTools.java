@@ -29,9 +29,6 @@ public class ServiceNowTools {
         this.rules = rules;
     }
 
-    @Tool(name = "sn_endpoints", description = "Which ServiceNow client is active and what it talks to (from cr-agent.yml).")
-    public String endpoints() { return sn.describe(); }
-
     @Tool(name = "get_change", description = "Read one change request by number. Returns its fields, its tasks and the hard-rule check result.")
     public Map<String, Object> getChange(@ToolParam(description = "Change number like CHG0012345") String number) {
         return describe(sn.getChange(number.trim()));

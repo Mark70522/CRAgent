@@ -1,6 +1,10 @@
 package com.company.cragent.tools;
 
 import com.company.cragent.config.KnowledgeProperties;
+import com.company.cragent.knowledge.ExampleStore;
+import com.company.cragent.knowledge.Regression;
+import com.company.cragent.model.ChangeRecord;
+import com.company.cragent.servicenow.ServiceNowClient;
 import com.company.cragent.validation.HardRule;
 import com.company.cragent.validation.RuleEngine;
 import org.springframework.ai.tool.annotation.Tool;
@@ -14,27 +18,29 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
 /**
- * The learning side: read and extend the rule files, archive good and rejected changes as examples.
- * Plain files under knowledge/, so people can edit them too and git tracks who changed what.
+ * The learning side: rules (hard-rules.yaml / soft-rules.md), archived examples (approved and rejected)
+ * and the regression that keeps the two consistent. Plain files under knowledge/, tracked by git.
  */
 @Component
 public class KnowledgeTools {
 
     private final KnowledgeProperties props;
     private final RuleEngine rules;
-    private final ServiceNowTools sn;
+    private final ServiceNowClient sn;
+    private final ExampleStore examples;
+    private final Regression regression;
 
-    public KnowledgeTools(KnowledgeProperties props, RuleEngine rules, ServiceNowTools sn) {
+    public KnowledgeTools(KnowledgeProperties props, RuleEngine rules, ServiceNowClient sn, ExampleStore examples, Regression regression) {
         this.props = props;
         this.rules = rules;
         this.sn = sn;
+        this.examples = examples;
+        this.regression = regression;
     }
 
     public record Rules(List<HardRule> hardRules, String softRules) {}
@@ -45,8 +51,10 @@ public class KnowledgeTools {
     }
 
     @Tool(name = "add_hard_rule", description = """
-            Append one machine-checkable rule (YAML mapping: id, description, type, field, ...) to hard-rules.yaml
-            and record it in changelog.md. Parsed first, rejected if invalid or if the id exists. Only after the user confirmed.""")
+            Append one machine-checkable rule (YAML mapping: id, description, type, field, ...) to hard-rules.yaml and record
+            it in changelog.md. Parsed first; rejected if invalid or the id exists. Afterwards the rule regression runs
+            automatically and its result is returned: if an approved example now fails, the rule is too strict - fix or
+            remove it (tell the user). Only call after the user confirmed the rule.""")
     public String addHardRule(
             @ToolParam(description = "YAML for one rule, e.g. \"id: HR-020\\ndescription: ...\\ntype: required\\nfield: backout_plan\"") String ruleYaml,
             @ToolParam(description = "Why: who asked / which rejection") String reason) {
@@ -58,7 +66,7 @@ public class KnowledgeTools {
         if (rules.loadRules().stream().anyMatch(x -> r.id().equalsIgnoreCase(x.id()))) throw new IllegalArgumentException("Rule id already exists: " + r.id());
         append(props.rulesDir().resolve("hard-rules.yaml"), "\n" + normalized + "\n");
         appendChangelog("hard", r.id(), r.description(), reason);
-        return "Added hard rule " + r.id();
+        return "Added hard rule " + r.id() + ". Regression: " + Regression.summary(regression.run());
     }
 
     @Tool(name = "add_soft_rule", description = "Append a judgement rule (wording, level of detail) to soft-rules.md and record it in changelog.md. Only after the user confirmed.")
@@ -71,69 +79,57 @@ public class KnowledgeTools {
         return "Added soft rule " + id;
     }
 
-    @Tool(name = "save_example", description = "Archive an approved change (read through get-change) under knowledge/examples/<category>/ as a gold example for future drafts.")
+    @Tool(name = "save_example", description = """
+            Archive an APPROVED change request (read through get-change) under knowledge/examples/<category>/ as YAML.
+            It becomes both a writing example for future drafts and a regression case: from now on no rule may fail it.""")
     public String saveExample(@ToolParam(description = "Change number") String number,
-                              @ToolParam(description = "Category folder, e.g. os-patch, db-patch, app-release") String category) {
-        Map<String, Object> rec = sn.getChange(number.trim());
-        Path file = props.examplesDir().resolve(safe(category)).resolve(number.trim() + ".md");
-        write(file, render(number.trim(), rec, null));
-        return "Saved " + file;
+                              @ToolParam(description = "Category = template name, e.g. os-patch, db-patch, app-release") String category) {
+        ChangeRecord rec = sn.getChange(number.trim());
+        Path f = examples.saveApproved(rec, category);
+        return "Saved " + rel(f) + ". Regression: " + Regression.summary(regression.run());
     }
 
-    @Tool(name = "save_rejected", description = "Archive a rejected change under knowledge/rejected/ with the rejection reason; the learn-rules skill mines these.")
+    @Tool(name = "save_rejected", description = """
+            Archive a REJECTED change request under knowledge/rejected/ with the rejection reason and, when known, the ids
+            of the hard rules that should catch it. It becomes a regression case: the rules must keep tripping on it.""")
     public String saveRejected(@ToolParam(description = "Change number") String number,
-                               @ToolParam(description = "Rejection reason as given by the approver or the boss") String reason) {
-        Map<String, Object> rec = sn.getChange(number.trim());
-        Path file = props.rejectedDir().resolve(number.trim() + ".md");
-        write(file, render(number.trim(), rec, reason));
-        return "Saved " + file;
+                               @ToolParam(description = "Rejection reason as given by the approver or the boss") String reason,
+                               @ToolParam(description = "Hard rule ids that should fire on it, e.g. [HR-011]; empty if none yet", required = false) List<String> expectedRules) {
+        ChangeRecord rec = sn.getChange(number.trim());
+        Path f = examples.saveRejected(rec, reason, expectedRules);
+        return "Saved " + rel(f) + ". Regression: " + Regression.summary(regression.run());
     }
 
-    @Tool(name = "list_examples", description = "List archived example and rejected change files with their first line.")
+    @Tool(name = "eval_rules", description = """
+            Run the rule regression: every approved example must pass the hard rules, every rejected example must trip
+            them (and the rules it lists as expected). Run after changing rules or templates; report failures to the user.""")
+    public Map<String, Object> evalRules() {
+        Regression.Report rep = regression.run();
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("ok", rep.ok());
+        m.put("approvedChecked", rep.approvedChecked());
+        m.put("rejectedChecked", rep.rejectedChecked());
+        m.put("failures", rep.failures());
+        return m;
+    }
+
+    @Tool(name = "list_examples", description = "Archived examples (approved, by category) and rejected changes, with file paths for read_example.")
     public Map<String, List<String>> listExamples() {
         Map<String, List<String>> out = new LinkedHashMap<>();
-        out.put("examples", listMd(props.examplesDir()));
-        out.put("rejected", listMd(props.rejectedDir()));
+        out.put("approved", examples.approved().stream().map(e -> e.relative(examples.root()) + " : " + e.category() + " : " + e.fields().getOrDefault("short_description", "")).toList());
+        out.put("rejected", examples.rejected().stream().map(e -> e.relative(examples.root()) + " : " + e.reason()).toList());
         return out;
     }
 
-    @Tool(name = "read_example", description = "Read one archived example or rejected file by its path as returned by list_examples.")
-    public String readExample(@ToolParam(description = "Relative path, e.g. examples/os-patch/CHG0030001.md") String relativePath) {
-        Path p = props.knowledgeDir().resolve(relativePath).normalize();
-        if (!p.startsWith(props.knowledgeDir().normalize())) throw new IllegalArgumentException("Path outside knowledge dir");
-        return readOrEmpty(p);
+    @Tool(name = "read_example", description = "Read one archived example or rejected file (YAML) by the path from list_examples.")
+    public String readExample(@ToolParam(description = "Relative path, e.g. examples/os-patch/CHG0012345.yaml") String relativePath) {
+        String s = examples.read(relativePath);
+        return s.isEmpty() ? "(no such file: " + relativePath + ")" : s;
     }
 
     // ------------------------------------------------------------------ helpers
 
-    @SuppressWarnings("unchecked")
-    private static String render(String number, Map<String, Object> rec, String rejectionReason) {
-        Map<String, String> f = (Map<String, String>) rec.get("fields");
-        List<Map<String, String>> tasks = (List<Map<String, String>>) rec.get("tasks");
-        StringBuilder sb = new StringBuilder("# ").append(number).append("\n\n");
-        if (rejectionReason != null) sb.append("**REJECTED:** ").append(rejectionReason).append("\n\n");
-        sb.append("## Fields\n\n");
-        f.forEach((k, v) -> {
-            if (v == null || v.isBlank()) return;
-            if (v.length() > 80 || v.contains("\n")) sb.append("### ").append(k).append("\n\n").append(v).append("\n\n");
-            else sb.append("- ").append(k).append(": ").append(v).append('\n');
-        });
-        if (tasks != null && !tasks.isEmpty()) {
-            sb.append("\n## Tasks\n\n");
-            for (Map<String, String> t : tasks) sb.append("- ").append(t).append('\n');
-        }
-        return sb.toString();
-    }
-
-    private List<String> listMd(Path dir) {
-        List<String> out = new ArrayList<>();
-        if (!Files.isDirectory(dir)) return out;
-        try (Stream<Path> s = Files.walk(dir)) {
-            s.filter(p -> p.toString().endsWith(".md") && !p.getFileName().toString().equalsIgnoreCase("README.md")).sorted()
-                    .forEach(p -> out.add(props.knowledgeDir().relativize(p).toString().replace('\\', '/') + " : " + readOrEmpty(p).lines().findFirst().orElse("")));
-        } catch (IOException e) { throw new IllegalStateException(e); }
-        return out;
-    }
+    private String rel(Path f) { return props.knowledgeDir().relativize(f).toString().replace('\\', '/'); }
 
     private void appendChangelog(String kind, String id, String summary, String reason) {
         append(props.rulesDir().resolve("changelog.md"), "- " + LocalDate.now() + " | " + kind + " | " + id + " | " + nz(summary) + " | " + nz(reason) + "\n");
@@ -142,14 +138,9 @@ public class KnowledgeTools {
         try { Files.createDirectories(file.getParent()); Files.writeString(file, text, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND); }
         catch (IOException e) { throw new IllegalStateException("Cannot write " + file, e); }
     }
-    private static void write(Path file, String text) {
-        try { Files.createDirectories(file.getParent()); Files.writeString(file, text, StandardCharsets.UTF_8); }
-        catch (IOException e) { throw new IllegalStateException("Cannot write " + file, e); }
-    }
     private static String readOrEmpty(Path p) {
         try { return Files.exists(p) ? Files.readString(p, StandardCharsets.UTF_8) : ""; }
         catch (IOException e) { throw new IllegalStateException("Cannot read " + p, e); }
     }
-    private static String safe(String s) { return s.trim().toLowerCase().replaceAll("[^a-z0-9._-]", "-"); }
     private static String nz(String s) { return s == null ? "" : s; }
 }
