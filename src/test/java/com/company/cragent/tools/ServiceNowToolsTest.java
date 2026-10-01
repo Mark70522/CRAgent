@@ -1,11 +1,16 @@
 package com.company.cragent.tools;
 
+import com.company.cragent.cockpit.CockpitModel.Task;
+import com.company.cragent.cockpit.CockpitStore;
+import com.company.cragent.config.CockpitProperties;
 import com.company.cragent.model.ChangeDraft;
 import com.company.cragent.model.ChangeRecord;
 import com.company.cragent.servicenow.ServiceNowClient;
 import com.company.cragent.validation.RuleEngine;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -49,8 +54,16 @@ class ServiceNowToolsTest {
         public String describe() { return "recording client"; }
     }
 
+    @TempDir Path tmp;
     final RecordingClient client = new RecordingClient();
-    final ServiceNowTools tools = new ServiceNowTools(client, new RuleEngine(Path.of("knowledge/rules/hard-rules.yaml")));
+    CockpitStore cockpit;
+    ServiceNowTools tools;
+
+    @BeforeEach
+    void setUp() {
+        cockpit = new CockpitStore(new CockpitProperties(tmp, 0, false), new ObjectMapper());
+        tools = new ServiceNowTools(client, new RuleEngine(Path.of("knowledge/rules/hard-rules.yaml")), cockpit);
+    }
 
     static ChangeDraft goodDraft() {
         Map<String, Object> f = new LinkedHashMap<>();
@@ -68,16 +81,16 @@ class ServiceNowToolsTest {
 
     @Test
     void createRefusesWithoutConfirmationAndWithRuleErrors() {
-        assertThatThrownBy(() -> tools.createChange(goodDraft(), false)).hasMessageContaining("confirmation");
+        assertThatThrownBy(() -> tools.createChange(goodDraft(), false, null)).hasMessageContaining("confirmation");
         ChangeDraft bad = goodDraft();
         bad.fields().put("short_description", "patch servers");
-        assertThatThrownBy(() -> tools.createChange(bad, true)).hasMessageContaining("hard-rule error");
+        assertThatThrownBy(() -> tools.createChange(bad, true, null)).hasMessageContaining("hard-rule error");
         assertThat(client.calls).isEmpty();
     }
 
     @Test
     void createThenReadThenUpdate() {
-        Map<String, Object> created = tools.createChange(goodDraft(), true);
+        Map<String, Object> created = tools.createChange(goodDraft(), true, null);
         assertThat(created.get("number")).isEqualTo("CHG0099");
         assertThat((Boolean) created.get("passed")).isTrue();
 
@@ -89,6 +102,24 @@ class ServiceNowToolsTest {
         @SuppressWarnings("unchecked") Map<String, String> f = (Map<String, String>) updated.get("fields");
         assertThat(f).containsEntry("risk", "High");
         assertThat(client.calls).containsExactly("create [PATCH] srv-app-01 - 2026-10 Windows monthly security patches", "get CHG0099", "update CHG0099 {risk=High}");
+    }
+
+    @Test
+    void createLinksTheCockpitTaskAndReadShowsIt() {
+        Task t = new Task(); t.title = "给 srv-app-01 打十月补丁";
+        String id = cockpit.addTasks(List.of(t), "paste").created().get(0).id;
+
+        Map<String, Object> created = tools.createChange(goodDraft(), true, id);
+        assertThat(((Task) created.get("task")).cr).isEqualTo("CHG0099");
+        assertThat(cockpit.task(id).orElseThrow().cr).isEqualTo("CHG0099");
+        assertThat(cockpit.taskNotes(id)).contains("CHG0099");
+
+        assertThat(((Task) tools.getChange("CHG0099").get("task")).id).isEqualTo(id);
+
+        // a wrong task id never turns a successful create into an error
+        Map<String, Object> again = tools.createChange(goodDraft(), true, "T-9999");
+        assertThat(again.get("number")).isEqualTo("CHG0099");
+        assertThat(again).containsKey("taskLinkError");
     }
 
     @Test

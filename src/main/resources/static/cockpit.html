@@ -153,7 +153,8 @@ h1,h2,h3{margin:0}
 .htitle{font-weight:500}
 .hmeta{font-size:12px;color:var(--ink-3);display:flex;gap:10px;flex-wrap:wrap;margin-top:2px}
 .hst{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500}
-.hst.done{background:var(--good-soft);color:var(--good)} .hst.todo,.hst.doing{background:var(--warn-soft);color:var(--warn)} .hst.dropped{background:var(--surface-2);color:var(--ink-3)}
+.hst.done{background:var(--good-soft);color:var(--good)} .hst.todo,.hst.doing{background:var(--warn-soft);color:var(--warn)} .hst.dropped{background:var(--surface-2);color:var(--ink-3)} .hst.waiting{background:var(--accent-soft);color:var(--accent)}
+.watch{display:flex;flex-direction:column;gap:8px} .watch .w{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:baseline;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)} .watch .w .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap} .watch .w .n{font-family:var(--mono);font-size:12px;color:var(--ink-3)} .watch .w.hot{border-color:var(--warn);background:var(--warn-soft)}
 .hbody{display:none;padding:4px 14px 14px;border-top:1px dashed var(--line);font-size:13px}
 .hrow.open .hbody{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px 22px}
 .hsec .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:10px 0 6px}
@@ -239,7 +240,9 @@ table.cr-t td.num{white-space:nowrap}
       <div class="grid2">
         <div class="card"><div class="card-h"><h2>今天的时间轴</h2><span class="meta">晨间启动时排的</span></div><div id="timeline"></div></div>
         <div class="card">
-          <div class="card-h"><h2>从前几天带过来的</h2><span class="meta">没做完会一直跟着你</span></div>
+          <div class="card-h"><h2>要盯着的</h2><span class="meta">在等的、快要执行的、挂着变更单的</span></div>
+          <div id="watch"></div>
+          <div class="sec-lbl" style="margin-top:16px">从前几天带过来的</div>
           <div id="carry"></div>
           <div class="sec-lbl" style="margin-top:16px">最近 7 天</div>
           <div class="stats" id="stats7"></div>
@@ -284,7 +287,7 @@ table.cr-t td.num{white-space:nowrap}
     <section class="view" id="v-history" hidden>
       <div class="hbar">
         <input class="ksearch" id="hq" placeholder="搜历史任务:标题、来源原文、笔记、沉淀出的知识 …" aria-label="搜索历史">
-        <select id="hstatus" aria-label="状态"><option value="all">全部状态</option><option value="done">已完成</option><option value="open">未完成</option><option value="dropped">已放弃</option></select>
+        <select id="hstatus" aria-label="状态"><option value="all">全部状态</option><option value="done">已完成</option><option value="open">未完成</option><option value="waiting">等待中</option><option value="dropped">已放弃</option></select>
         <select id="hsort" aria-label="排序"><option value="created">按创建时间</option><option value="done">按完成时间</option><option value="updated">按最近更新</option></select>
       </div>
       <div class="hint" id="hcount"></div>
@@ -309,7 +312,8 @@ table.cr-t td.num{white-space:nowrap}
     <div class="say"><b>早安</b><span>它读昨天没做完的和相关知识,给你今天的三件事,确认后写进计划。</span></div>
     <div class="say"><b>记成任务:(贴一段邮件或聊天)</b><span>它拆成任务存进来,和已有的自动合并。</span></div>
     <div class="say"><b>记一笔:坑 …</b><span>落到今天的随手记,和这个页面同一份。</span></div>
-    <div class="say"><b>上次 srv-db-01 回退花了多久</b><span>它只从你的知识和任务笔记里找,并说出处。</span></div>
+    <div class="say"><b>T-0001 等 CAB 审批</b><span>任务变成「等待中」,早安时单独列出,不会再催你做。</span></div>
+    <div class="say"><b>上次 CCS 补丁的坑是什么</b><span>它只从你的知识和任务笔记里找,并说出处。</span></div>
     <div class="say"><b>收工</b><span>统计今天、把值得留的提出来让你确认、生成明天草稿。</span></div>
     <div class="hint">这个页面和 Copilot 工具读写同一批文件:cockpit/ 目录。</div>
   </aside>
@@ -319,6 +323,7 @@ table.cr-t td.num{white-space:nowrap}
 (function(){
   var S = null;
   var kinds = { decision:'决定', pitfall:'坑', learned:'学到' };
+  var repeatName = { monthly:'每月', weekly:'每周', quarterly:'每季度' };
   var titles = { morning:'早上好,先看看今天', day:'一边做,一边记', evening:'今天到这里,留下值得留的', knowledge:'你沉淀下来的', history:'做过的每一件事', change:'变更单' };
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function api(path, body){ return fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : undefined).then(function(r){ return r.json(); }); }
@@ -329,14 +334,19 @@ table.cr-t td.num{white-space:nowrap}
   function taskHtml(t, opts){
     opts = opts||{};
     var sub = [];
-    if (t.est!=null) sub.push('预计 <span class="num">'+fmtMin(t.est)+'</span>');
+    if (t.status==='waiting') sub.push('等 '+esc(t.waitingOn||'…'));
+    if (t.cr) sub.push('<span class="num">'+esc(t.cr)+'</span>');
+    if (t.scheduledAt) sub.push('执行 <span class="num">'+esc(t.scheduledAt)+'</span>');
+    if (t.est!=null) sub.push('预计 <span class="num">'+fmtMin(t.est)+'</span>'+(t.estBy==='ai'?'<small>(AI 估)</small>':''));
     if (t.due) sub.push('截止 <span class="num">'+esc(t.due)+'</span>');
     if (t.carried) sub.push('已带 <span class="num">'+t.carried+'</span> 天');
+    if (t.repeat) sub.push(esc(repeatName[t.repeat]||t.repeat));
     if (t.source && t.source!=='paste') sub.push(esc(t.source));
     var more = '<dl class="kn">'
       + (t.context ? '<dt>来源</dt><dd>'+esc(t.context)+'</dd>' : '')
       + (t.tags && t.tags.length ? '<dt>标签</dt><dd>'+esc(t.tags.join(' · '))+'</dd>' : '')
       + '<dt>编号</dt><dd class="num">'+esc(t.id)+'</dd>'
+      + (t.cr ? '<dt>变更单</dt><dd class="num">'+esc(t.cr)+'</dd>' : '')
       + (t.plannedFor ? '<dt>排在</dt><dd class="num">'+esc(t.plannedFor)+'</dd>' : '')
       + '</dl>';
     return '<div class="task'+(t.status==='done'?' done':'')+'" data-id="'+esc(t.id)+'">'
@@ -368,6 +378,12 @@ table.cr-t td.num{white-space:nowrap}
     var tl = day.timeline||[];
     document.getElementById('timeline').innerHTML = tl.length ? '<div class="tl">'+tl.map(function(s){ return '<div class="tl-row"><div class="tl-t">'+esc(s.time)+'</div><div class="tl-l"></div><div class="tl-b"><b>'+esc(s.label)+'</b>'+(s.minutes?' <span class="m">· '+fmtMin(s.minutes)+'</span>':'')+'</div></div>'; }).join('')+'</div>' : '<div class="empty">晨间启动时会排出来</div>';
     document.getElementById('carry').innerHTML = tasksBlock(S.carryOver, '没有拖着的任务');
+    var A = S.attention || {waiting:[],scheduled:[],overdueRun:[],withChange:[]}, ws = [];
+    A.overdueRun.forEach(function(t){ ws.push('<div class="w hot"><span class="k">该跑完了</span><span>'+esc(t.title)+' <span class="n">'+esc(t.scheduledAt)+(t.cr?' · '+esc(t.cr):'')+'</span><br><small>执行时间已过还没标完成:做了吗?变更单关了吗?</small></span></div>'); });
+    A.scheduled.forEach(function(t){ ws.push('<div class="w"><span class="k">快执行</span><span>'+esc(t.title)+' <span class="n">'+esc(t.scheduledAt)+(t.cr?' · '+esc(t.cr):' · 还没有变更单')+'</span></span></div>'); });
+    A.waiting.forEach(function(t){ ws.push('<div class="w"><span class="k">在等</span><span>'+esc(t.title)+' <span class="n">等 '+esc(t.waitingOn||'…')+(t.cr?' · '+esc(t.cr):'')+'</span></span></div>'); });
+    A.withChange.filter(function(t){ return t.status!=='waiting' && !t.scheduledAt; }).forEach(function(t){ ws.push('<div class="w"><span class="k">变更单</span><span>'+esc(t.title)+' <span class="n">'+esc(t.cr)+'</span></span></div>'); });
+    document.getElementById('watch').innerHTML = ws.length ? '<div class="watch">'+ws.join('')+'</div>' : '<div class="empty">没有在等的、也没有排了执行时间的</div>';
     var last7 = S.recentStats.slice(-7), planned=0, done=0, ks=0;
     last7.forEach(function(d){ planned+=d.planned; done+=d.done; ks+=d.knowledgeSaved; });
     document.getElementById('stats7').innerHTML =
@@ -431,7 +447,7 @@ table.cr-t td.num{white-space:nowrap}
   }
 
   // ── history: sorted by time, keyword reaches notes and knowledge ──
-  var statusName = { done:'已完成', todo:'未完成', doing:'进行中', dropped:'已放弃' };
+  var statusName = { done:'已完成', todo:'未完成', doing:'进行中', waiting:'等待中', dropped:'已放弃' };
   function loadHistory(){
     var q = document.getElementById('hq').value.trim(), st = document.getElementById('hstatus').value, sort = document.getElementById('hsort').value;
     api('/api/history?q='+encodeURIComponent(q)+'&status='+st+'&sort='+sort+'&limit=300').then(function(rows){
@@ -442,8 +458,11 @@ table.cr-t td.num{white-space:nowrap}
         var m = when.slice(0,7);
         if (m !== month) { month = m; html += '<div class="hmonth">'+esc(m || '未知月份')+'</div>'; }
         var meta = [];
-        if (t.est!=null) meta.push('预计 '+fmtMin(t.est));
+        if (t.cr) meta.push(esc(t.cr));
+        if (t.status==='waiting' && t.waitingOn) meta.push('等 '+esc(t.waitingOn));
+        if (t.est!=null) meta.push('预计 '+fmtMin(t.est)+(t.estBy==='ai'?'(AI 估)':''));
         if (t.spent!=null) meta.push('实际 '+fmtMin(t.spent));
+        if (t.repeat) meta.push(repeatName[t.repeat]||esc(t.repeat));
         if (t.carried) meta.push('拖了 '+t.carried+' 天');
         if (h.days.length) meta.push('排过 '+h.days.length+' 天');
         if (h.notes.length) meta.push(h.notes.length+' 条笔记');
@@ -458,6 +477,8 @@ table.cr-t td.num{white-space:nowrap}
           + '<li><span class="d">创建</span><span class="num">'+esc(t.createdAt||'')+'</span></li>'
           + (t.doneAt ? '<li><span class="d">完成</span><span class="num">'+esc(t.doneAt)+'</span></li>' : '')
           + (t.due ? '<li><span class="d">截止</span><span class="num">'+esc(t.due)+'</span></li>' : '')
+          + (t.scheduledAt ? '<li><span class="d">执行</span><span class="num">'+esc(t.scheduledAt)+'</span></li>' : '')
+          + (t.cr ? '<li><span class="d">变更单</span><span class="num">'+esc(t.cr)+'</span></li>' : '')
           + (h.days.length ? '<li><span class="d">排在</span><span class="num">'+esc(h.days.join(' · '))+'</span></li>' : '')
           + (t.tags && t.tags.length ? '<li><span class="d">标签</span><span>'+esc(t.tags.join(' · '))+'</span></li>' : '')
           + '</ul>';

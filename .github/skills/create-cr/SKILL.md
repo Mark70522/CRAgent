@@ -12,6 +12,10 @@ Goal: a change request that passes approval the first time. Follow the steps in 
 Extract: servers or service name, what is being changed, desired start time, anything specific the user
 gave (ticket numbers, patch names, versions, business confirmation). No start time → ask.
 
+Is this CR for one of the user's cockpit tasks? `list_tasks` (open) and match by wording ("给 CCS PROD
+打补丁" ↔ a task about CCS PROD patching). If one matches, remember its id and use its `scheduledAt`
+as the default start time; if the task has a `cr` already, say so and stop - review-cr is the skill then.
+
 ## 2. Ground the facts
 
 1. `read_rules`.
@@ -46,9 +50,11 @@ the user / assumptions. Ask to confirm or correct. Apply corrections, re-validat
 
 ## 6. Create
 
-Only when the user explicitly says to create: `create_change` with `confirmed=true`. Report what the
-endpoint returned (the number if it is in the response). Remind the user that submitting for approval
-is still done by them.
+Only when the user explicitly says to create: `create_change` with `confirmed=true` and `taskId` when a
+cockpit task matched in step 1 (the task then carries the number and the morning brief tracks it).
+Report what the endpoint returned (the number if it is in the response). Remind the user that
+submitting for approval is still done by them; once submitted they can say "T-xxxx 等审批" and the
+task moves to waiting.
 
 ## 7. Learn
 

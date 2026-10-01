@@ -1,5 +1,6 @@
 package com.company.cragent.tools;
 
+import com.company.cragent.cockpit.CockpitStore;
 import com.company.cragent.model.ChangeDraft;
 import com.company.cragent.model.ChangeRecord;
 import com.company.cragent.model.Violation;
@@ -23,31 +24,48 @@ public class ServiceNowTools {
 
     private final ServiceNowClient sn;
     private final RuleEngine rules;
+    private final CockpitStore cockpit;
 
-    public ServiceNowTools(ServiceNowClient sn, RuleEngine rules) {
+    public ServiceNowTools(ServiceNowClient sn, RuleEngine rules, CockpitStore cockpit) {
         this.sn = sn;
         this.rules = rules;
+        this.cockpit = cockpit;
     }
 
-    @Tool(name = "get_change", description = "Read one change request by number. Returns its fields, its tasks and the hard-rule check result.")
+    @Tool(name = "get_change", description = """
+            Read one change request by number. Returns its fields, its tasks, the hard-rule check result and,
+            when a cockpit task is linked to this number, that task under `task`.""")
     public Map<String, Object> getChange(@ToolParam(description = "Change number like CHG0012345") String number) {
-        return describe(sn.getChange(number.trim()));
+        Map<String, Object> out = describe(sn.getChange(number.trim()));
+        cockpit.tasks().stream().filter(t -> number.trim().equalsIgnoreCase(t.cr)).findFirst().ifPresent(t -> out.put("task", t));
+        return out;
     }
 
     @Tool(name = "create_change", description = """
             Create a change request from a draft (fields and tasks named exactly as the template says).
             Hard rules run first and creation is refused while an error-level violation remains. Set confirmed=true
-            only after the user has seen the final draft and explicitly said to create it.""")
+            only after the user has seen the final draft and explicitly said to create it.
+            Pass taskId when the CR is for one of the user's cockpit tasks (check list_tasks): the task then
+            carries the new number, and the morning brief tracks the CR until the task is done.""")
     public Map<String, Object> createChange(
             @ToolParam(description = "The complete draft") ChangeDraft draft,
-            @ToolParam(description = "Must be true; pass true only after the user explicitly confirmed") boolean confirmed) {
+            @ToolParam(description = "Must be true; pass true only after the user explicitly confirmed") boolean confirmed,
+            @ToolParam(description = "Cockpit task id (T-0001) this CR belongs to, if any", required = false) String taskId) {
         if (!confirmed) throw new IllegalStateException("Not created: show the draft to the user and ask for confirmation, then call again with confirmed=true.");
         List<Violation> v = rules.validate(draft.fieldsAsText(), draft.tasksAsText());
         List<Violation> errors = v.stream().filter(x -> "error".equalsIgnoreCase(x.severity())).toList();
         if (!errors.isEmpty()) throw new IllegalStateException("Not created: " + errors.size() + " hard-rule error(s) remain: " + errors);
         ChangeRecord rec = sn.createChange(draft);
         log.info("created change {}", rec.number());
-        return describe(rec);
+        Map<String, Object> out = describe(rec);
+        if (taskId != null && !taskId.isBlank() && rec.number() != null && !rec.number().isBlank()) {
+            try {
+                out.put("task", cockpit.linkChange(taskId.trim(), rec.number()));
+            } catch (IllegalArgumentException e) {
+                out.put("taskLinkError", e.getMessage());   // the CR exists; a bad task id must not look like a failed create
+            }
+        }
+        return out;
     }
 
     @Tool(name = "update_change", description = """

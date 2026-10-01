@@ -54,20 +54,26 @@ public class CockpitStore {
         return tasks().stream().filter(t -> t.id.equalsIgnoreCase(id)).findFirst();
     }
 
-    /** Result of add: which were created, which merged into an existing task. */
-    public record AddResult(List<Task> created, List<Task> merged) {}
+    /**
+     * Result of add: which were created, which merged into an existing task, and for each created task the
+     * past tasks that look like it (last time's cost and pitfalls) so Copilot can mention them right away.
+     */
+    public record AddResult(List<Task> created, List<Task> merged, List<Related> related) {}
 
     public synchronized AddResult addTasks(List<Task> incoming, String source) {
         List<Task> all = tasks();
         List<Task> created = new ArrayList<>(), merged = new ArrayList<>();
+        List<Related> related = new ArrayList<>();
         String now = now();
         for (Task in : incoming) {
             if (in.title == null || in.title.isBlank()) continue;
-            Task dup = all.stream().filter(t -> !"done".equals(t.status) && !"dropped".equals(t.status)
-                    && similar(t.title, in.title)).findFirst().orElse(null);
+            Task dup = all.stream().filter(t -> t.isOpen() && similar(t.title, in.title)).findFirst().orElse(null);
             if (dup != null) {
-                if (in.est != null && dup.est == null) dup.est = in.est;
+                if (in.est != null && dup.est == null) { dup.est = in.est; dup.estBy = in.estBy; }
                 if (in.due != null) dup.due = in.due;
+                if (in.scheduledAt != null) dup.scheduledAt = in.scheduledAt;
+                if (in.cr != null && dup.cr == null) dup.cr = in.cr;
+                if (in.repeat != null && dup.repeat == null) dup.repeat = in.repeat;
                 if (in.priority != null && "P1".equals(in.priority)) dup.priority = "P1";
                 if (in.context != null && !in.context.isBlank()) appendTaskNote(dup.id, "补充(" + now + "):" + in.context);
                 dup.updatedAt = now;
@@ -80,7 +86,11 @@ public class CockpitStore {
             t.source = source == null ? "paste" : source;
             t.priority = in.priority == null ? "P2" : in.priority;
             t.est = in.est;
+            t.estBy = in.est == null ? null : (in.estBy == null ? "user" : in.estBy);
             t.due = in.due;
+            t.scheduledAt = in.scheduledAt;
+            t.cr = in.cr;
+            t.repeat = in.repeat;
             t.context = in.context;
             t.tags = in.tags == null ? new ArrayList<>() : in.tags;
             t.createdAt = now;
@@ -88,9 +98,55 @@ public class CockpitStore {
             all.add(t);
             created.add(t);
             if (in.context != null && !in.context.isBlank()) appendTaskNote(t.id, "来源(" + now + "):" + in.context);
+            related.addAll(relatedPast(t, all));
         }
         write(props.backlog(), all);
-        return new AddResult(created, merged);
+        return new AddResult(created, merged, related);
+    }
+
+    /** Finished tasks that look like this one, newest first, with the pitfall / learned lines from their notes. */
+    public synchronized List<Related> relatedPast(Task t, List<Task> all) {
+        return all.stream()
+                .filter(p -> !p.id.equals(t.id) && !p.isOpen() && similar(p.title, t.title))
+                .sorted(Comparator.comparing((Task p) -> p.doneAt == null ? p.updatedAt == null ? "" : p.updatedAt : p.doneAt).reversed())
+                .limit(3)
+                .map(p -> {
+                    Related r = new Related();
+                    r.forTask = t.id; r.id = p.id; r.title = p.title; r.status = p.status; r.doneAt = p.doneAt;
+                    r.est = p.est; r.spent = p.spent; r.cr = p.cr;
+                    for (String line : taskNotes(p.id).split("\n")) {
+                        String l = line.startsWith("- ") ? line.substring(2).trim() : line.trim();
+                        if (l.matches("(?i).*(坑|学到|决定|pitfall|learned|decision).*")) r.pitfalls.add(l);
+                    }
+                    return r;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /** Tie a task to the change request that was created for it. Idempotent; records the link in the task's notes. */
+    public synchronized Task linkChange(String taskId, String number) {
+        Task t = updateTask(taskId, Map.of("cr", number), "变更单 " + number + " 已创建");
+        return t;
+    }
+
+    /** What to watch besides the plan: waiting tasks, runs coming up within a week, runs already past, open CRs. */
+    public synchronized Attention attention(String date) {
+        String d = date == null || date.isBlank() ? today() : date;
+        String weekLater = LocalDate.parse(d).plusDays(7).toString();
+        Attention a = new Attention();
+        for (Task t : tasks()) {
+            if (!t.isOpen()) continue;
+            if ("waiting".equals(t.status)) a.waiting.add(t);
+            if (t.cr != null && !t.cr.isBlank()) a.withChange.add(t);
+            if (t.scheduledAt != null && !t.scheduledAt.isBlank()) {
+                String day = t.scheduledAt.substring(0, Math.min(10, t.scheduledAt.length()));
+                if (day.compareTo(d) < 0) a.overdueRun.add(t);
+                else if (day.compareTo(weekLater) <= 0) a.scheduled.add(t);
+            }
+        }
+        a.scheduled.sort(Comparator.comparing(t -> t.scheduledAt));
+        a.overdueRun.sort(Comparator.comparing(t -> t.scheduledAt));
+        return a;
     }
 
     public synchronized Task updateTask(String id, Map<String, String> fields, String note) {
@@ -101,11 +157,21 @@ public class CockpitStore {
             String v = e.getValue();
             switch (e.getKey()) {
                 case "title" -> t.title = v;
-                case "status" -> { t.status = v; if ("done".equals(v)) t.doneAt = now(); else t.doneAt = null; }
+                case "status" -> {
+                    if (!Set.of("todo", "doing", "waiting", "done", "dropped").contains(v)) throw new IllegalArgumentException("Unknown status " + v);
+                    t.status = v;
+                    if ("done".equals(v)) t.doneAt = now(); else t.doneAt = null;
+                    if (!"waiting".equals(v)) t.waitingOn = null;
+                }
                 case "priority" -> t.priority = v;
-                case "est" -> t.est = v == null || v.isBlank() ? null : Integer.parseInt(v.trim());
+                case "est" -> { t.est = v == null || v.isBlank() ? null : Integer.parseInt(v.trim()); if (t.est != null && t.estBy == null) t.estBy = "user"; }
+                case "estBy" -> t.estBy = blankToNull(v);
                 case "spent" -> t.spent = v == null || v.isBlank() ? null : Integer.parseInt(v.trim());
-                case "due" -> t.due = v;
+                case "due" -> t.due = blankToNull(v);
+                case "scheduledAt", "scheduled" -> t.scheduledAt = blankToNull(v);
+                case "waitingOn" -> { t.waitingOn = blankToNull(v); if (t.waitingOn != null && t.isActionable()) t.status = "waiting"; }
+                case "cr" -> t.cr = blankToNull(v);
+                case "repeat" -> t.repeat = blankToNull(v);
                 case "context" -> t.context = v;
                 case "tags" -> t.tags = v == null ? new ArrayList<>() : Arrays.stream(v.split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
                 default -> throw new IllegalArgumentException("Unknown field " + e.getKey());
@@ -145,7 +211,7 @@ public class CockpitStore {
     public synchronized List<Task> carryOver(String date) {
         String d = date == null ? today() : date;
         return tasks().stream()
-                .filter(t -> ("todo".equals(t.status) || "doing".equals(t.status)))
+                .filter(Task::isActionable)
                 .filter(t -> t.plannedFor != null && t.plannedFor.compareTo(d) < 0)
                 .sorted(Comparator.comparing((Task t) -> t.priority).thenComparing(t -> t.plannedFor))
                 .collect(Collectors.toList());
@@ -393,7 +459,8 @@ public class CockpitStore {
         return byId.values().stream()
                 .filter(h -> switch (st) {
                     case "all" -> true;
-                    case "open" -> "todo".equals(h.task.status) || "doing".equals(h.task.status);
+                    case "open" -> h.task.isOpen();
+                    case "actionable" -> h.task.isActionable();
                     default -> st.equals(h.task.status);
                 })
                 .filter(h -> from == null || from.isBlank() || (h.sortTime != null && h.sortTime.compareTo(from) >= 0))
@@ -419,6 +486,7 @@ public class CockpitStore {
     // ------------------------------------------------------------------ helpers
 
     public static String today() { return LocalDate.now().toString(); }
+    static String blankToNull(String v) { return v == null || v.isBlank() ? null : v.trim(); }
     static String now() { return LocalDateTime.now().format(TS); }
 
     static String nextId(List<Task> all) {

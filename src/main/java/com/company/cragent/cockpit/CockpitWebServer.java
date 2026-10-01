@@ -110,7 +110,8 @@ public class CockpitWebServer {
         m.put("day", day);
         m.put("planTasks", day.plan.stream().map(byId::get).filter(t -> t != null).collect(Collectors.toList()));
         m.put("carryOver", store.carryOver(day.date));
-        m.put("openTasks", byId.values().stream().filter(t -> "todo".equals(t.status) || "doing".equals(t.status)).collect(Collectors.toList()));
+        m.put("openTasks", byId.values().stream().filter(t -> t.isOpen()).collect(Collectors.toList()));
+        m.put("attention", store.attention(day.date));
         List<DayStat> stats = store.stats().days;
         m.put("recentStats", stats.subList(Math.max(0, stats.size() - 14), stats.size()));
         m.put("knowledge", store.knowledgeCards());

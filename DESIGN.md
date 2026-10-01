@@ -85,9 +85,22 @@ create-change 的 body:不写模板 = 草稿字段平铺;写模板可用 `${fiel
 
 ## 日课驾驶舱
 
-任务只来自你贴给 Copilot 的文本。数据在 `cockpit/`:`backlog.json`、`days/日期.json`、`task-notes/T-xxxx.md`、`knowledge/<ascii>.md`(主题名在首行)、`stats.json`。
-三条流程:`morning-brief`(读昨天和知识 → 三件事 → 确认后 `plan_day`)、`capture`(`add_tasks` 自动合并相似;`capture_note` 分类;问过去只从文件答)、`evening-close`(统计 → 逐条确认 `save_knowledge` → `close_day`)。
+任务只来自你贴给 Copilot 的文本。数据在 `cockpit/`(gitignore,个人数据):`backlog.json`、`days/日期.json`、`task-notes/T-xxxx.md`、`knowledge/<ascii>.md`(主题名在首行)、`stats.json`。
+三条流程:`morning-brief`(读昨天和知识 → 三件事 + 盯着的清单 → 确认后 `plan_day`)、`capture`(`add_tasks` 自动合并相似并返回以前做过的同类任务;`capture_note` 分类;问过去只从文件答)、`evening-close`(统计 → 逐条确认 `save_knowledge` → 周期任务滚到下一期 → `close_day`)。
 `task_history` 把一个任务的全部记录拼起来,按时间排、关键字搜。页面和工具读写同一批文件。
+
+任务的生命周期按运维的实际走:
+
+| 字段 / 状态 | 含义 |
+|---|---|
+| `todo` / `doing` | 今天能做的;早安只从这里挑三件事 |
+| `waiting` + `waitingOn` | 在等审批、回复、窗口;算未完成但不算拖延,早安单独列出 |
+| `scheduledAt` | 真正执行的时间(维护窗口),和 `due`(必须完成)分开;`get_day.attention` 给出 7 天内要执行的和已过时未完成的 |
+| `cr` | 挂着的变更单号;`create_change(taskId=…)` 自动回填,`get_change` 反向带出任务;有 CR 的任务要 CR 关了才算完 |
+| `est` + `estBy` | 工时只记用户说的;Copilot 猜的标 `ai`,页面显示「AI 估」 |
+| `repeat` | 每月 / 每周 / 每季度;做完时提议建下一期 |
+
+每个事实有来源这条原则也适用于任务:文本里没有的工时、日期不填,别人的任务先问。
 
 ## 代码结构
 

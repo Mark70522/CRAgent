@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CockpitStoreTest {
 
@@ -109,6 +110,49 @@ class CockpitStoreTest {
         assertThat(s.history("验证完", null, null, null, null, 50)).extracting(x -> x.task.id).containsExactly("T-0001");
         assertThat(s.history("intellij", null, null, null, null, 50)).extracting(x -> x.task.id).containsExactly("T-0003");
         assertThat(s.history("不存在的词", null, null, null, null, 50)).isEmpty();
+    }
+
+    @Test
+    void waitingScheduledAndRecurringTasksAreTracked() {
+        CockpitStore s = store();
+        // last month's patch, finished, with a pitfall in its notes
+        s.addTasks(List.of(t("给 CCS PROD 打 OS 补丁", null, "P2")), "paste");
+        s.updateTask("T-0001", Map.of("status", "done", "spent", "150", "cr", "CHG0001"), "坑: 02 要等 01 验证完再开始");
+
+        // this month's: estimate came from the AI, runs on a Sunday window, recurs monthly
+        Task next = t("CCS PROD OS 补丁", 120, "P2");
+        next.estBy = "ai"; next.scheduledAt = "2026-10-11 01:00"; next.repeat = "monthly";
+        var r = s.addTasks(List.of(next), "paste");
+        assertThat(r.created()).hasSize(1);
+        assertThat(r.created().get(0).estBy).isEqualTo("ai");
+        assertThat(r.related()).hasSize(1);
+        assertThat(r.related().get(0).id).isEqualTo("T-0001");
+        assertThat(r.related().get(0).spent).isEqualTo(150);
+        assertThat(r.related().get(0).cr).isEqualTo("CHG0001");
+        assertThat(r.related().get(0).pitfalls).hasSize(1).first().asString().contains("验证完");
+
+        // waiting for approval: still open, not actionable, not nagged as carried over
+        s.planDay("2026-10-05", List.of("T-0002"), null, null);
+        Task w = s.updateTask("T-0002", Map.of("waitingOn", "CAB 审批"), null);
+        assertThat(w.status).isEqualTo("waiting");
+        assertThat(w.isOpen()).isTrue();
+        assertThat(w.isActionable()).isFalse();
+        assertThat(s.carryOver("2026-10-06")).isEmpty();
+        assertThat(s.history(null, "open", null, null, null, 10)).extracting(h -> h.task.id).containsExactly("T-0002");
+
+        Attention a = s.attention("2026-10-06");
+        assertThat(a.waiting).extracting(x -> x.id).containsExactly("T-0002");
+        assertThat(a.scheduled).extracting(x -> x.id).containsExactly("T-0002");
+        assertThat(a.overdueRun).isEmpty();
+        assertThat(s.attention("2026-10-12").overdueRun).extracting(x -> x.id).containsExactly("T-0002");
+
+        // back to doing clears waitingOn; linking a CR writes the number and a note
+        assertThat(s.updateTask("T-0002", Map.of("status", "doing"), null).waitingOn).isNull();
+        Task linked = s.linkChange("T-0002", "CHG0002");
+        assertThat(linked.cr).isEqualTo("CHG0002");
+        assertThat(s.taskNotes("T-0002")).contains("CHG0002");
+        assertThat(s.attention("2026-10-06").withChange).extracting(x -> x.id).containsExactly("T-0002");
+        assertThatThrownBy(() -> s.updateTask("T-0002", Map.of("status", "paused"), null)).hasMessageContaining("Unknown status");
     }
 
     @Test

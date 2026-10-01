@@ -31,8 +31,11 @@ public class CockpitTools {
     /** One task as Copilot extracts it from pasted text. */
     public record TaskInput(
             String title,
-            @ToolParam(description = "Estimated minutes", required = false) Integer est,
-            @ToolParam(description = "Due date yyyy-MM-dd", required = false) String due,
+            @ToolParam(description = "Estimated minutes, ONLY if the user stated a duration. Leave empty otherwise; never guess.", required = false) Integer est,
+            @ToolParam(description = "Due date yyyy-MM-dd: when it must be finished, if stated", required = false) String due,
+            @ToolParam(description = "When the work itself runs, yyyy-MM-dd HH:mm (a maintenance window, a release slot), if stated and different from due", required = false) String scheduledAt,
+            @ToolParam(description = "Change request number if the text names one (CHG...)", required = false) String cr,
+            @ToolParam(description = "monthly | weekly | quarterly when the text says it recurs (每月 / 每周 / 每季度)", required = false) String repeat,
             @ToolParam(description = "P1 must do today, P2 today, P3 can slip. Default P2", required = false) String priority,
             @ToolParam(description = "Where it came from and any detail worth keeping: who asked, the original wording", required = false) String context,
             @ToolParam(description = "Free tags, e.g. servicenow, patch, meeting", required = false) List<String> tags) {}
@@ -42,7 +45,9 @@ public class CockpitTools {
     @Tool(name = "add_tasks", description = """
             Store tasks extracted from text the user pasted (an email, meeting notes, a chat message, a one-liner).
             Duplicates of open tasks (same or very similar title) are merged instead of created; the result says which.
-            Keep titles short and verb-first; put the original wording and who asked into context.""")
+            Keep titles short and verb-first; put the original wording and who asked into context.
+            The result also lists `related`: finished tasks that look like each new one, with last time's est / spent /
+            CR number and the pitfall lines from their notes. Mention those to the user in one line each.""")
     public Map<String, Object> addTasks(
             @ToolParam(description = "Tasks to add") List<TaskInput> tasks,
             @ToolParam(description = "Source label: paste (default), email, meeting, chat", required = false) String source) {
@@ -50,6 +55,7 @@ public class CockpitTools {
         for (TaskInput ti : tasks) {
             Task t = new Task();
             t.title = ti.title(); t.est = ti.est(); t.due = ti.due(); t.priority = ti.priority(); t.context = ti.context();
+            t.scheduledAt = ti.scheduledAt(); t.cr = ti.cr(); t.repeat = ti.repeat();
             t.tags = ti.tags() == null ? new ArrayList<>() : ti.tags();
             in.add(t);
         }
@@ -57,25 +63,30 @@ public class CockpitTools {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("created", r.created());
         out.put("mergedInto", r.merged());
+        out.put("related", r.related());
         return out;
     }
 
     @Tool(name = "list_tasks", description = """
-            List tasks. status filter: open (todo+doing, default), todo, doing, done, dropped, all.
-            Each task carries est (minutes), due, priority, plannedFor and carried (days it slipped).""")
-    public List<Task> listTasks(@ToolParam(description = "open | todo | doing | done | dropped | all", required = false) String status) {
+            List tasks. status filter: open (todo+doing+waiting, default), actionable (todo+doing), todo, doing,
+            waiting, done, dropped, all. Each task carries est (+estBy user|ai), due, scheduledAt (when it runs),
+            waitingOn, cr (linked change number), repeat, priority, plannedFor and carried (days it slipped).""")
+    public List<Task> listTasks(@ToolParam(description = "open | actionable | todo | doing | waiting | done | dropped | all", required = false) String status) {
         String s = status == null || status.isBlank() ? "open" : status.trim().toLowerCase();
         return store.tasks().stream().filter(t -> switch (s) {
             case "all" -> true;
-            case "open" -> "todo".equals(t.status) || "doing".equals(t.status);
+            case "open" -> t.isOpen();
+            case "actionable" -> t.isActionable();
             default -> s.equals(t.status);
         }).collect(Collectors.toList());
     }
 
     @Tool(name = "update_task", description = """
-            Update a task: fields is a map of column -> value among title, status (todo|doing|done|dropped),
-            priority (P1|P2|P3), est (minutes), spent (minutes), due (yyyy-MM-dd), context, tags (comma separated).
-            Optional note is appended to the task's own notes file with a timestamp.""")
+            Update a task: fields is a map of column -> value among title, status (todo|doing|waiting|done|dropped),
+            waitingOn (what it waits for: approval, a reply, the window; setting it also sets status=waiting),
+            priority (P1|P2|P3), est (minutes), estBy (user|ai), spent (minutes), due (yyyy-MM-dd),
+            scheduledAt (yyyy-MM-dd HH:mm, when it runs), cr (change number), repeat (monthly|weekly|quarterly),
+            context, tags (comma separated). Optional note is appended to the task's own notes file with a timestamp.""")
     public Task updateTask(
             @ToolParam(description = "Task id like T-0003") String id,
             @ToolParam(description = "Fields to change", required = false) Map<String, String> fields,
@@ -91,8 +102,9 @@ public class CockpitTools {
 
     @Tool(name = "get_day", description = """
             Everything needed for the morning brief or a status check: the day's file (brief, plan, timeline, notes,
-            summary), the planned tasks in full, tasks carried over from earlier days, the last 7 closed days' stats
-            and the knowledge topics that exist. date defaults to today.""")
+            summary), the planned tasks in full, tasks carried over from earlier days, `attention` (waiting tasks,
+            runs scheduled within 7 days, runs whose scheduled time already passed, open tasks with a CR number),
+            the last 7 closed days' stats and the knowledge topics that exist. date defaults to today.""")
     public Map<String, Object> getDay(@ToolParam(description = "yyyy-MM-dd, default today", required = false) String date) {
         Day day = store.day(date);
         Map<String, Task> byId = store.tasks().stream().collect(Collectors.toMap(t -> t.id, t -> t, (a, b) -> a, LinkedHashMap::new));
@@ -100,7 +112,8 @@ public class CockpitTools {
         out.put("day", day);
         out.put("planTasks", day.plan.stream().map(byId::get).filter(t -> t != null).collect(Collectors.toList()));
         out.put("carryOver", store.carryOver(day.date));
-        out.put("openTasks", byId.values().stream().filter(t -> "todo".equals(t.status) || "doing".equals(t.status)).collect(Collectors.toList()));
+        out.put("openTasks", byId.values().stream().filter(t -> t.isOpen()).collect(Collectors.toList()));
+        out.put("attention", store.attention(day.date));
         List<DayStat> stats = store.stats().days;
         out.put("recentStats", stats.subList(Math.max(0, stats.size() - 7), stats.size()));
         out.put("knowledgeTopics", store.knowledgeCards());

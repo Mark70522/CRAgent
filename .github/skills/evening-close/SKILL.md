@@ -1,6 +1,6 @@
 ---
 name: evening-close
-description: End the day. When the user says 收工 / 下班 / close the day / wrap up, tally what got done, pull the notes worth keeping out of today's log and save the ones the user confirms to the knowledge files, propose tomorrow, and close the day with close_day.
+description: End the day. When the user says 收工 / 下班 / close the day / wrap up, tally what got done, pull the notes worth keeping out of today's log and save the ones the user confirms to the knowledge files, roll recurring work forward, propose tomorrow, and close the day with close_day.
 ---
 
 # evening-close
@@ -10,9 +10,14 @@ Goal: nothing learned today is lost, and tomorrow starts pre-planned.
 ## 1. Tally
 
 1. `get_day` (today). Check the plan tasks: which are done. Ask about any planned task with no
-   status change ("T-0012 做了吗?") and `update_task` accordingly (done / still open / dropped).
+   status change ("T-0012 做了吗?") and `update_task` accordingly: done / still open / dropped /
+   **waiting** (waitingOn=... when it is now blocked on approval, a reply or a window).
    Ask for actual time only if the user mentions it; never nag.
-2. Summarise in one sentence: done/planned, the most important thing finished, what slips.
+2. A task marked done that has a `cr`: ask once whether the change request is closed too. If not,
+   keep the task open as waiting (waitingOn="关 CHG...") instead of done.
+3. A task marked done that has `repeat`: propose the next occurrence (same title, next month / week /
+   quarter as `due`, same `repeat`, context = "上一次 T-xxxx") and `add_tasks` it only if the user agrees.
+4. Summarise in one sentence: done/planned, the most important thing finished, what slips.
 
 ## 2. Keep what matters
 
@@ -28,8 +33,9 @@ Goal: nothing learned today is lost, and tomorrow starts pre-planned.
 
 ## 3. Tomorrow
 
-Propose tomorrow's first three: unfinished P1 today, then due-soon, then the previous
-`tomorrow` list. Keep it to ids and titles; the morning brief will do the reasoning.
+Propose tomorrow's first three: unfinished P1 today, then anything in `attention.scheduled` that runs
+within two days (pre-checks), then due-soon, then the previous `tomorrow` list. Waiting tasks are not
+candidates. Keep it to ids and titles; the morning brief will do the reasoning.
 
 ## 4. Close
 
