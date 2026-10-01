@@ -47,19 +47,19 @@ servicenow:
   base-url: https://sn-gateway.company.internal
   auth: { type: bearer, token-env: SN_TOKEN }
   endpoints:
-    get-change:     { method: GET,  path: /change/${number}, result: data, tasks: tasks }
-    create-change:  { method: POST, path: /change, result: data }
-    search-changes: { method: GET,  path: /change, query: { ci: "${ci}", limit: "${limit}" }, result: data.items }
+    get-change:    { method: GET,   path: /change/${number}, result: data, tasks: tasks }
+    create-change: { method: POST,  path: /change,           result: data }
+    update-change: { method: PATCH, path: /change/${number}, result: data }
 ```
 
-程序只认三个名字:`get-change`(读一张)、`create-change`(建)、`search-changes`(查历史,可没有)。别的接口随便加,Copilot 用 `sn_call` 调。规则:
+只有这三个接口:读、建、改。对应三个工具 `get_change`、`create_change`、`update_change`;建和改都要你确认才发。规则:
 
 | 键 | 意思 |
 |---|---|
 | `${xxx}` | 占位符,来自调用参数。path / query 里按文本替换;body 里按 JSON 替换(字符串带引号,对象整体插入) |
 | `result` | 返回 JSON 里记录的位置,点分隔;空 = 整个返回 |
 | `tasks` | 记录里 task 列表的位置,给页面和校验用,可不填 |
-| `body` | 不写 = 草稿字段平铺成 JSON;有外层包装就写模板,如 `'{"request": ${fields}, "tasks": ${tasks}}'` |
+| `body` | 不写 = 字段平铺成 JSON;有外层包装就写模板,如 `'{"request": ${fields}, "tasks": ${tasks}}'`。update 时 `${fields}` 是要改的字段,`${number}` 是单号 |
 | `headers` / `query` | 都可以带 `${xxx}` |
 
 **服务器清单**:`knowledge/inventory.xlsx`,三列必有(服务、环境、服务器),表头在 `inventory.columns` 里对一下。
@@ -81,8 +81,8 @@ servicenow:
 | 你说 | 发生什么 |
 |---|---|
 | `看一下 CHG0012345` | `get_change` 读出来并跑规则,页面「变更单」视图能看全文和接口原始返回 |
-| `用 create-cr skill,给 Order Portal 的 prod 打十月补丁,周日 1 点` | 查清单 → 看历史 → 套模板 → 填描述 → 校验 → 给你确认 → 调 create-change |
-| `审一下 CHG0012345` | 逐条规则给出问题和改法 |
+| `用 create-cr skill,给 Order Portal 的 prod 打十月补丁,周日 1 点` | 查清单 → 看范例 → 套模板 → 填描述 → 校验 → 给你确认 → 调 create-change |
+| `审一下 CHG0012345` | 逐条规则给出问题和改法;你说"改"它才调 update-change |
 | `被打回了,理由是 …` | 存档、提炼规则问你要不要加 |
 | `早安` / `记成任务` / `记一笔` / `收工` | 驾驶舱的早晚流程,见 `.github/skills/` |
 
@@ -92,7 +92,7 @@ servicenow:
 
 1. `cr-agent.yml` 填 `base-url`、认证、`get-change` 一个接口。`java scripts/CallTool.java get_change "{\"number\":\"真实单号\"}"`,返回和页面上一致就通了。
 2. 页面「变更单」里看同一张单,底部"接口原始返回"告诉你字段叫什么;对着改模板的键名和规则的 `field`。
-3. 配 `create-change`,账号先只给读权限,跑 create-cr 看草稿;满意了再给写权限。
-4. 有 `search-changes` 接口就配上,草稿会参考历史;没有也能用。
+3. 配 `create-change` 和 `update-change`,账号先只给读权限,跑 create-cr 看草稿;满意了再给写权限。
+4. 过审的好单用 `save_example` 存进 `knowledge/examples/`,以后的草稿照着写。
 
 出错看 `logs/cr-agent.log`。详细设计见 [DESIGN.md](DESIGN.md)。

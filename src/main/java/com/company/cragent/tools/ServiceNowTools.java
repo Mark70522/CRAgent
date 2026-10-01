@@ -17,15 +17,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Everything that touches ServiceNow goes through the endpoints you described in cr-agent.yml.
- * Three endpoint names have a meaning for the program: get-change, create-change, search-changes.
- * Any other endpoint you add can be called with sn_call.
+ * The three ServiceNow operations, each bound to an endpoint you describe in cr-agent.yml:
+ *   get-change     read one change request
+ *   create-change  create one
+ *   update-change  change fields of an existing one
+ * Nothing else talks to ServiceNow.
  */
 @Component
 public class ServiceNowTools {
 
     private static final Logger log = LoggerFactory.getLogger(ServiceNowTools.class);
-    public static final String GET = "get-change", CREATE = "create-change", SEARCH = "search-changes";
+    public static final String GET = "get-change", CREATE = "create-change", UPDATE = "update-change";
 
     private final EndpointClient sn;
     private final RuleEngine rules;
@@ -37,45 +39,24 @@ public class ServiceNowTools {
         this.props = props;
     }
 
-    @Tool(name = "sn_endpoints", description = "The ServiceNow endpoints configured in cr-agent.yml (name, method, path). Call this when unsure what is available.")
+    @Tool(name = "sn_endpoints", description = "Which of the three ServiceNow endpoints (get-change, create-change, update-change) are configured in cr-agent.yml, with method and path.")
     public Map<String, String> endpoints() {
         if (!sn.configured()) return Map.of("_", "ServiceNow is not configured: set servicenow.base-url and servicenow.endpoints in cr-agent.yml");
         return sn.endpoints();
     }
 
-    @Tool(name = "sn_call", description = """
-            Call one configured ServiceNow endpoint by name with parameters; parameters fill the ${placeholders}
-            in its path, query and body. Returns the record(s) at the endpoint's result path. Read-only endpoints
-            can be called freely; for anything that writes, confirm with the user first.""")
-    public JsonNode call(
-            @ToolParam(description = "Endpoint name from sn_endpoints") String endpoint,
-            @ToolParam(description = "Parameters, e.g. {\"number\":\"CHG0012345\"}", required = false) Map<String, Object> params) {
-        return sn.call(endpoint, params == null ? Map.of() : params);
-    }
-
     @Tool(name = "get_change", description = """
-            Read one change request by number through the get-change endpoint. Returns its fields, its tasks
-            (when the endpoint declares where they are) and the hard-rule check result.""")
+            Read one change request by number (endpoint get-change). Returns its fields, its tasks when the
+            endpoint says where they are, and the hard-rule check result.""")
     public Map<String, Object> getChange(@ToolParam(description = "Change number like CHG0012345") String number) {
-        JsonNode rec = sn.call(GET, Map.of("number", number.trim()));
-        return describe(rec);
-    }
-
-    @Tool(name = "search_changes", description = """
-            Search change requests through the search-changes endpoint (only if configured). Parameters are
-            passed to the endpoint's placeholders, typically ci / keyword / limit. Use the results as examples
-            of wording, fields and task sequences that passed approval.""")
-    public List<Map<String, String>> searchChanges(
-            @ToolParam(description = "Parameters for the search-changes endpoint, e.g. {\"ci\":\"srv-app-01\",\"limit\":5}", required = false) Map<String, Object> params) {
-        if (!sn.has(SEARCH)) throw new IllegalStateException("No search-changes endpoint in cr-agent.yml; add one or skip the history step.");
-        return sn.flattenList(sn.call(SEARCH, params == null ? Map.of() : params));
+        return describe(sn.call(GET, Map.of("number", number.trim())));
     }
 
     @Tool(name = "create_change", description = """
-            Create a change request through the create-change endpoint. The draft's fields are sent as the
-            request body (or inserted into the endpoint's body template as ${fields} / ${tasks}). Hard rules run
-            first and creation is refused when an error-level violation remains. Set confirmed=true only after
-            the user has seen the final draft and explicitly said to create it.""")
+            Create a change request (endpoint create-change). The draft's fields are sent as the request body
+            (or inserted into the endpoint's body template as ${fields} / ${tasks}). Hard rules run first and
+            creation is refused while an error-level violation remains. Set confirmed=true only after the user
+            has seen the final draft and explicitly said to create it.""")
     public Map<String, Object> createChange(
             @ToolParam(description = "The complete draft") ChangeDraft draft,
             @ToolParam(description = "Must be true; pass true only after the user explicitly confirmed") boolean confirmed) {
@@ -87,11 +68,26 @@ public class ServiceNowTools {
         params.put("fields", draft.fields());
         params.put("tasks", draft.tasks());
         JsonNode rec = sn.call(CREATE, params);
-        log.info("create-change returned {}", rec.toString().length() > 200 ? rec.toString().substring(0, 200) : rec);
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("result", rec);
-        out.put("note", "Created through endpoint create-change. Tasks were included in the same call only if your endpoint body uses ${tasks}.");
-        return out;
+        log.info("create-change returned {}", head(rec));
+        return Map.of("result", rec);
+    }
+
+    @Tool(name = "update_change", description = """
+            Update fields of an existing change request (endpoint update-change). fields is a map of field name
+            -> new value, names exactly as your interface expects. Available in the body template as ${fields}
+            and as single ${name} values; ${number} is the change number. Set confirmed=true only after the user
+            explicitly agreed to the change.""")
+    public Map<String, Object> updateChange(
+            @ToolParam(description = "Change number") String number,
+            @ToolParam(description = "Field name -> new value") Map<String, Object> fields,
+            @ToolParam(description = "Must be true; pass true only after the user explicitly confirmed") boolean confirmed) {
+        if (!confirmed) throw new IllegalStateException("Not updated: show the user exactly what will change and ask for confirmation, then call again with confirmed=true.");
+        Map<String, Object> params = new LinkedHashMap<>(fields == null ? Map.of() : fields);
+        params.put("number", number.trim());
+        params.put("fields", fields == null ? Map.of() : fields);
+        JsonNode rec = sn.call(UPDATE, params);
+        log.info("update-change {} returned {}", number, head(rec));
+        return Map.of("result", rec);
     }
 
     /** Record -> fields, tasks (if the endpoint says where), violations. Shared with the web viewer. */
@@ -108,4 +104,6 @@ public class ServiceNowTools {
         out.put("raw", rec);
         return out;
     }
+
+    private static String head(JsonNode n) { String s = String.valueOf(n); return s.length() > 200 ? s.substring(0, 200) + "..." : s; }
 }

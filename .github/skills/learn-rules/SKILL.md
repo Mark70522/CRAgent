@@ -23,7 +23,7 @@ Rules live in files, not in the model. This skill turns evidence into entries th
 
 ## C. Mine approvals
 
-1. `search_changes` (if configured) or `list_examples` for approved examples per template category.
+1. `list_examples` / `read_example` for approved examples per template category, or `get_change` on numbers the user gives.
 2. Look for consistent patterns: title format, description sections, always-filled fields, task sequence.
 3. Propose template adjustments (knowledge/templates/*.yaml, edited by hand) and soft rules.
 4. Offer to `save_example` the best ones.

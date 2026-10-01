@@ -20,8 +20,9 @@ gave (ticket numbers, patch names, versions, business confirmation). No start ti
    The result includes each server's maintenance window; the usual one is Sunday 00:00-06:00. If the
    requested time is outside it, say so once and ask the user to confirm (HR-018 only warns).
 3. `list_templates` → pick by keywords; none fits → say so and offer the closest.
-4. If `sn_endpoints` lists `search-changes`: `search_changes` for the same server, a few results, and use
-   their wording, field values and task sequence as the reference. No such endpoint → skip this step.
+4. `list_examples` → read one or two archived examples of the same category (`read_example`) and use their
+   wording, field values and task sequence as the reference. If the user names an earlier change,
+   `get_change` it instead.
 
 ## 3. Build
 

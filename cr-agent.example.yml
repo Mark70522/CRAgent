@@ -16,33 +16,26 @@ servicenow:
   # proxy-host: proxy.company.com
   # proxy-port: 8080
 
-  # ---- 你们的接口, 有几个写几个。程序只认三个名字: get-change / create-change / search-changes,
-  #      其他名字的接口 Copilot 可以用 sn_call 调。
-  #      ${xxx} 是占位符, 来自调用时的参数: path / query 里按文本替换, body 里按 JSON 替换。
+  # ---- 三个接口: 读 / 创建 / 更新。名字固定, 内容按你们的接口填。
+  #      ${xxx} 是占位符, 来自调用时的参数: path / query / headers 里按文本替换, body 里按 JSON 替换。
   #      result 是返回 JSON 里记录所在的位置(点分隔), 空 = 整个返回。
   endpoints:
-    get-change:
+    get-change:                  # 参数: number
       method: GET
       path: /change/${number}
       result: data               # 比如返回 {"data": {...}} 就写 data
       tasks: tasks               # 记录里 task 列表所在的键(可选, 给页面和校验用)
-      description: 按单号读一张 CR
-    create-change:
+    create-change:               # 参数: fields(草稿全部字段的对象), tasks(数组), 以及每个字段单独的 ${字段名}
       method: POST
       path: /change
-      # body 不写 = 把草稿字段平铺成 JSON 发出去。接口有外层包装就写模板, 例如:
+      # body 不写 = 草稿字段平铺成 JSON 发出去。接口有外层包装就写模板, 例如:
       # body: '{"request": ${fields}, "tasks": ${tasks}}'
       result: data
-      description: 创建 CR, 返回新单
-    search-changes:              # 可选。没有就删掉, create-cr 会跳过"看相似历史"这一步
-      method: GET
-      path: /change
-      query:
-        ci: "${ci}"
-        status: closed
-        limit: "${limit}"
-      result: data.items
-      description: 按服务器查历史 CR
+    update-change:               # 参数: number, fields(要改的字段对象), 以及每个字段单独的 ${字段名}
+      method: PATCH              # 或 PUT / POST, 按你们接口
+      path: /change/${number}
+      # body: '{"request": ${fields}}'
+      result: data
 
 # ---- 服务器清单: 你们的 Excel ----
 inventory:

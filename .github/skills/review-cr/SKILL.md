@@ -9,7 +9,7 @@ description: Review an existing change request (by number) or a draft against th
 
 1. `read_rules`.
 2. `get_change` for the number (returns fields, tasks and the hard-rule result), or use the pasted draft.
-3. If `search-changes` is configured: two approved examples for the same server, to compare detail.
+3. `list_examples` / `read_example`: one or two archived approved examples of the same category, to compare detail.
 
 ## 2. Check
 
@@ -21,10 +21,14 @@ description: Review an existing change request (by number) or a draft against th
 ## 3. Report
 
 One table: rule id | severity | field | problem | proposed fix (the actual replacement text).
-Then a verdict: ready to submit / needs the fixes above. Changing the record in ServiceNow is done
-by the user unless an update endpoint is configured; then call it with `sn_call` only after confirmation.
+Then a verdict: ready to submit / needs the fixes above.
 
-## 4. Learn from a rejection
+## 4. Apply (only if the user asks)
+
+Show exactly which fields will change and the new text; after the user agrees, `update_change` with
+`confirmed=true`. Then `get_change` again and show the new hard-rule result.
+
+## 5. Learn from a rejection
 
 If the user says it was rejected: ask for the reason, `save_rejected`, then for each reason decide
 whether a rule already covers it; if not, propose one (hard if checkable, else soft) and add it with

@@ -22,7 +22,7 @@ cr-agent(一个 Java 进程,Spring Boot 3.5 + Spring AI MCP,stdio)
 
 ## 原则
 
-1. **不预设 ServiceNow 的形状。** 程序里没有表名、列名、路径。每个调用都是 `cr-agent.yml` 里的一条 endpoint 描述:方法、路径、query、body 模板、返回里记录的位置。接口变了改 yml。
+1. **不预设 ServiceNow 的形状,只预留三个动作。** 读(get-change)、建(create-change)、改(update-change),每个都是 `cr-agent.yml` 里的一条 endpoint 描述:方法、路径、query、body 模板、返回里记录的位置。程序里没有表名、列名、路径;接口变了改 yml。
 2. **字段名不翻译。** 模板里写什么名字,草稿就是什么名字,直接发给接口。规则引擎按同样的名字查。少一层映射就少一处对不上。
 3. **规则是文件。** 硬规则 yaml(必填、枚举、正则、长度、时间顺序、task 数量、窗口)每次校验重读;软规则 md 由 Copilot 判断。老板的要求落在文件里,有 changelog。
 4. **每个事实有来源。** 草稿字段标注来自清单、模板、历史还是用户;没有来源的留空问人。
@@ -36,7 +36,7 @@ cr-agent(一个 Java 进程,Spring Boot 3.5 + Spring AI MCP,stdio)
  ├─ read_rules
  ├─ lookup_ci / lookup_service        Excel;带维护窗口,窗口外只提醒(HR-018 是 warn)
  ├─ list_templates                    按关键词选
- ├─ search_changes(有 search-changes 接口才做)   相似历史当范例
+ ├─ list_examples / read_example      归档的过审范例
  ├─ build_draft                       模板默认字段 + 标题 + 描述章节骨架(TODO)+ task 时间线 + 窗口
  ├─ Copilot 填 TODO
  ├─ validate_draft ⟲                  硬规则,error 清零
@@ -64,7 +64,7 @@ create-change 的 body:不写模板 = 草稿字段平铺;写模板可用 `${fiel
 
 | 组 | 工具 |
 |---|---|
-| ServiceNow | `sn_endpoints` `sn_call` `get_change` `search_changes` `create_change` |
+| ServiceNow | `sn_endpoints` `get_change` `create_change` `update_change`(建和改都要 confirmed=true) |
 | 清单 | `lookup_ci` `lookup_service` |
 | 模板 / 校验 | `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` |
 | 规则与范例 | `read_rules` `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` `list_examples` `read_example` |
@@ -94,6 +94,6 @@ src/test/...                             EndpointClientTest(本地 HttpServer)Ru
 
 ## 已知限制
 
-- 创建 task 和 CR 是不是同一个调用,取决于你的接口;分开的接口用 `sn_call` 再调一次,create-cr skill 里可补一步。
+- 创建 task 和 CR 是不是同一个调用,取决于你的接口;分开的话 create-change 的 body 模板里不放 `${tasks}`,再加一个接口时在 ServiceNowTools 里加一个方法。
 - 维护窗口规则是全局提醒(周日 00:00-06:00,warn),按服务器区分要在 hard-rules 里加 `when`。
 - 页面「变更单」的中文字段标签只认标准名,其他字段按接口原名显示。
