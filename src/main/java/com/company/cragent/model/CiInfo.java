@@ -1,14 +1,12 @@
 package com.company.cragent.model;
 
-/** A configuration item (server) as seen in the CMDB. */
+/** One server from the inventory spreadsheet. */
 public record CiInfo(
-        String sysId,
         String name,
-        String ipAddress,
-        String ciClass,
+        String ip,
         String os,
         String environment,
         String ownerGroup,
-        String businessApplication,
-        String maintenanceSchedule) {
+        String service,
+        String maintenanceWindow) {
 }

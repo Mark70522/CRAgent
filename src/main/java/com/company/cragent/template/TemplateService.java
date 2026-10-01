@@ -59,7 +59,7 @@ public class TemplateService {
         vars.put("ci", cis.isEmpty() ? "" : cis.get(0).name());
         vars.put("ci_owner_group", cis.isEmpty() || cis.get(0).ownerGroup() == null ? "" : cis.get(0).ownerGroup());
         vars.put("environment", cis.isEmpty() || cis.get(0).environment() == null ? "" : cis.get(0).environment());
-        vars.put("service", cis.isEmpty() || cis.get(0).businessApplication() == null ? "" : cis.get(0).businessApplication());
+        vars.put("service", cis.isEmpty() || cis.get(0).service() == null ? "" : cis.get(0).service());
         vars.put("summary", summary == null ? "" : summary);
 
         Map<String, Object> fields = new LinkedHashMap<>();

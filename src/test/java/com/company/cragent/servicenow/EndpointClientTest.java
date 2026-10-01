@@ -70,8 +70,10 @@ class EndpointClientTest {
         assertThat(received.get(0)).doesNotContain("empty=");   // placeholders without a value drop the query param
 
         received.clear();
-        c.call("create-change", Map.of("number", "CHG0001", "user", "doug",
-                "fields", Map.of("short_description", "x", "risk", "Low"), "tasks", List.of(Map.of("order", "10"))));
+        java.util.LinkedHashMap<String, Object> fields = new java.util.LinkedHashMap<>();
+        fields.put("short_description", "x");
+        fields.put("risk", "Low");
+        c.call("create-change", Map.of("number", "CHG0001", "user", "doug", "fields", fields, "tasks", List.of(Map.of("order", "10"))));
         assertThat(received.get(0)).contains("POST /change").contains("body={\"request\": {\"short_description\":\"x\",\"risk\":\"Low\"}, \"tasks\": [{\"order\":\"10\"}], \"by\": \"doug\"}");
 
         JsonNode items = c.call("list", Map.of());

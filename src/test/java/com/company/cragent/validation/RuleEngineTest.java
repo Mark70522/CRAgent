@@ -49,7 +49,7 @@ class RuleEngineTest {
     }
 
     @Test
-    void catchesTheMockRejectionReasons() {
+    void catchesTypicalRejectionReasons() {
         Map<String, String> f = goodFields();
         f.put("short_description", "patch servers");
         f.put("description", "install patches this weekend");

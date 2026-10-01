@@ -73,7 +73,7 @@ yaml 模式的规则:
 | `body` | 不写 = 字段平铺成 JSON;有外层包装就写模板,如 `'{"request": ${fields}, "tasks": ${tasks}}'`。update 时 `${fields}` 是要改的字段,`${number}` 是单号 |
 | `headers` / `query` | 都可以带 `${xxx}` |
 
-**服务器清单**:`knowledge/inventory.xlsx`,三列必有(服务、环境、服务器),表头在 `inventory.columns` 里对一下。
+**服务器清单**:把你们的 Excel 放到 `knowledge/inventory.xlsx`(三列必有:服务、环境、服务器),表头在 `inventory.columns` 里对一下。`knowledge/inventory.sample.xlsx` 是格式示例,只给单元测试用。
 
 **驾驶舱**:端口、目录,一般不用改。
 

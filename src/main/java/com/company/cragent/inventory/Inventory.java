@@ -33,7 +33,7 @@ public class Inventory {
     private static final Logger log = LoggerFactory.getLogger(Inventory.class);
 
     public record Entry(String service, String environment, String server, String ip, String os, String ownerGroup, String maintenanceWindow) {
-        CiInfo toCi() { return new CiInfo("inventory:" + server, server, ip, "server", os, environment, ownerGroup, service, maintenanceWindow); }
+        CiInfo toCi() { return new CiInfo(server, ip, os, environment, ownerGroup, service, maintenanceWindow); }
     }
 
     private final InventoryProperties props;
@@ -63,7 +63,7 @@ public class Inventory {
     public List<String> services() { return entries().stream().map(Entry::service).distinct().sorted().toList(); }
 
     public String windowFor(CiInfo ci) {
-        return ci.maintenanceSchedule() == null || ci.maintenanceSchedule().isBlank() ? props.maintenanceWindow() : ci.maintenanceSchedule();
+        return ci.maintenanceWindow() == null || ci.maintenanceWindow().isBlank() ? props.maintenanceWindow() : ci.maintenanceWindow();
     }
 
     public synchronized List<Entry> entries() {

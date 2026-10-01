@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class InventoryTest {
 
-    private final Inventory inv = new Inventory(new InventoryProperties("knowledge/inventory.xlsx", "", null, "Sun 00:00-06:00"));
+    private final Inventory inv = new Inventory(new InventoryProperties("knowledge/inventory.sample.xlsx", "", null, "Sun 00:00-06:00"));
 
     @Test
     void readsHeadersIgnoringCaseAndSpaces() {
@@ -33,7 +33,7 @@ class InventoryTest {
     @Test
     void explainsMissingColumns() {
         InventoryProperties.Columns wrong = new InventoryProperties.Columns("Application", null, null, null, null, null, null);
-        Inventory bad = new Inventory(new InventoryProperties("knowledge/inventory.xlsx", "", wrong, null));
+        Inventory bad = new Inventory(new InventoryProperties("knowledge/inventory.sample.xlsx", "", wrong, null));
         assertThatThrownBy(bad::entries).hasMessageContaining("no column 'Application'").hasMessageContaining("cr-agent.yml");
     }
 }

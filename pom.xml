@@ -59,7 +59,7 @@
       <artifactId>snakeyaml</artifactId>
     </dependency>
 
-    <!-- Server inventory from Excel (knowledge/inventory.xlsx) -->
+    <!-- Server inventory from Excel -->
     <dependency>
       <groupId>org.apache.poi</groupId>
       <artifactId>poi-ooxml</artifactId>

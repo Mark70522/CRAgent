@@ -14,9 +14,9 @@ import java.util.Map;
  *   auth: { type: bearer, token-env: SN_TOKEN }          # or: { type: basic, user: svc, password-env: SN_PASSWORD }
  *   headers: { X-Api-Key: "..." }                        # optional, sent on every call
  *   endpoints:
- *     get-change:     { method: GET,  path: /change/${number}, result: data, tasks: tasks }
- *     create-change:  { method: POST, path: /change, body: '${fields}', result: data }
- *     search-changes: { method: GET,  path: /change, query: { ci: "${ci}", limit: "${limit}" }, result: data.items }
+ *     get-change:    { method: GET,   path: /change/${number}, result: data, tasks: tasks }
+ *     create-change: { method: POST,  path: /change, body: '{"request": ${fields}}', result: data }
+ *     update-change: { method: PATCH, path: /change/${number}, result: data }
  * </pre>
  * Placeholders are {@code ${name}} and come from the call's parameters. In {@code path} and {@code query} the
  * value is inserted as text (URL-encoded); in {@code body} it is inserted as JSON (strings quoted, maps as objects).

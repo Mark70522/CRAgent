@@ -20,7 +20,7 @@ class TemplateServiceTest {
 
     @Test
     void buildsTaskTimelineBackToBack() {
-        CiInfo ci = new CiInfo("x", "srv-app-01", "10.0.1.11", "server", "Windows", "prod", "Wintel Ops", "Order Portal", "Sun 00:00-06:00");
+        CiInfo ci = new CiInfo("srv-app-01", "10.0.1.11", "Windows", "prod", "Wintel Ops", "Order Portal", "Sun 00:00-06:00");
         ChangeDraft d = service.buildDraft(service.getTemplate("os-patch"), List.of(ci), "2026-10-11 01:00:00", "2026-10 Windows patches");
 
         assertThat(d.fields().get("short_description")).isEqualTo("[PATCH] srv-app-01 - 2026-10 Windows patches");

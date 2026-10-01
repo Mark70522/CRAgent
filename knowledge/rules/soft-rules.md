@@ -22,7 +22,7 @@ _Why:_ CAB asks for this every time it is missing. (2026-09-25)
 The backout plan states a concrete action (restore snapshot X, rollback patch Y, switch slot back)
 and the time it takes. Saying "rollback if needed" is not a backout plan.
 
-_Why:_ Rejected changes CHG0030004 style. (2026-09-25)
+_Why:_ "Rollback if needed" is the most common reason a backout plan gets rejected. (2026-09-25)
 
 ### SR-004
 Task titles are verbs ("Apply Windows patches"), each task has one owner group, and the last task
