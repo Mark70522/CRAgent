@@ -510,11 +510,31 @@ table.cr-t td.num{white-space:nowrap}
           + '</ul>';
         body += '<div class="hsec"><div class="k">时间与归档</div>'+facts+'</div>';
         if (h.notesText) body += '<div class="hsec" style="grid-column:1/-1"><div class="k">任务笔记文件</div><pre>'+esc(h.notesText)+'</pre></div>';
+        // actions: everything is reversible, and nothing changes before a second click
+        var acts = [];
+        if (t.status === 'done' || t.status === 'dropped') acts.push(['reopen', '退回未完成', (t.status==='done'?'已完成':'已放弃')+' → 未完成,会重新出现在待办里']);
+        if (t.status === 'waiting') acts.push(['reopen', '不等了,可以做了', '等待中 → 未完成']);
+        if (t.status === 'todo' || t.status === 'doing') { acts.push(['done', '标记完成', '未完成 → 已完成' + (t.cr ? ',变更单 '+t.cr+' 也关了?' : '')]); acts.push(['drop', '放弃', '未完成 → 已放弃,不删除,随时可退回']); }
+        body += '<div class="hsec hact" style="grid-column:1/-1"><div class="k">操作</div><div class="ask" data-id="'+esc(t.id)+'">'
+          + acts.map(function(a){ return '<button type="button" class="btn ghost" data-act="'+a[0]+'" data-why="'+esc(a[2])+'">'+a[1]+'</button>'; }).join('')
+          + '</div></div>';
         html += '<div class="hrow"><button class="hrow-h"><span class="hdate">'+esc(when.slice(0,16))+'</span><span><div class="htitle">'+esc(t.title)+'</div><div class="hmeta">'+meta.map(function(x){return '<span>'+x+'</span>';}).join('')+'</div></span><span class="hst '+esc(t.status)+'">'+(statusName[t.status]||esc(t.status))+'</span></button><div class="hbody">'+body+'</div></div>';
       });
       document.getElementById('hlist').innerHTML = html;
       document.querySelectorAll('.hrow-h').forEach(function(b){ b.onclick = function(){ b.closest('.hrow').classList.toggle('open'); }; });
+      bindHistActions(document.getElementById('hlist'));
     });
+  }
+  // History row actions: first click asks, second click does; cancel puts the buttons back untouched.
+  function bindHistActions(scope){
+    scope.querySelectorAll('.hact [data-act]').forEach(function(b){ b.onclick = function(){
+      var box = b.closest('.ask'), id = box.dataset.id, act = b.dataset.act, before = box.innerHTML;
+      var fields = act === 'done' ? {status:'done'} : act === 'drop' ? {status:'dropped'} : {status:'todo'};
+      box.innerHTML = '<b>'+esc(b.textContent)+'?</b><span>'+esc(b.dataset.why)+'</span><span class="sp"></span>'
+        + '<button type="button" class="btn" data-yes>确定</button><button type="button" class="btn ghost" data-no>取消</button>';
+      box.querySelector('[data-yes]').onclick = function(){ api('/api/task', {id:id, fields:fields}).then(function(){ loadHistory(); load(); }); };
+      box.querySelector('[data-no]').onclick = function(){ box.innerHTML = before; bindHistActions(box.parentNode); };
+    }; });
   }
   // ── change request viewer ──
   var LONG = [['description','描述'],['justification','变更理由'],['implementation_plan','实施计划'],['risk_impact_analysis','风险与影响分析'],['backout_plan','回退方案'],['test_plan','测试计划']];
