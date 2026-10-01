@@ -19,6 +19,8 @@ mvn -q -DskipTests package        # 产出 target/cr-agent.jar
 
 **只用页面**:双击 `run.bat`,浏览器开 http://127.0.0.1:7777/ 。关窗口就停。
 
+**页面开机自启,不依赖 IntelliJ**:`cockpit-autostart.bat install` 一次,以后登录 Windows 就有页面(后台 javaw,无窗口,日志 `logs/cockpit.log`);`remove` 取消,`start` / `stop` 手动起停。Copilot 之后拉起自己的 cr-agent 时发现端口被占只记一条 warn,工具照常用,两个进程读写的是同一批文件。
+
 **在 Copilot 里用**:IntelliJ → Copilot Chat → Agent 模式 → 工具图标 → Configure MCP,写入(绝对路径,反斜杠写两个):
 
 ```json
