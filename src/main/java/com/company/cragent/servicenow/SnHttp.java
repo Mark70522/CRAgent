@@ -9,13 +9,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.net.InetSocketAddress;
-import java.net.Proxy;
+import java.net.ProxySelector;
+import java.time.Duration;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -143,11 +144,12 @@ public class SnHttp {
 
     private synchronized RestClient client() {
         if (http != null) return http;
-        SimpleClientHttpRequestFactory f = new SimpleClientHttpRequestFactory();
-        f.setConnectTimeout(props.timeout());
-        f.setReadTimeout(props.timeout());
+        // java.net.http.HttpClient, not HttpURLConnection: the old one cannot send PATCH, which update endpoints often use
+        java.net.http.HttpClient.Builder hc = java.net.http.HttpClient.newBuilder().connectTimeout(Duration.ofMillis(props.timeout()));
         if (props.proxyHost() != null && !props.proxyHost().isBlank())
-            f.setProxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(props.proxyHost(), props.proxyPort() == null ? 8080 : props.proxyPort())));
+            hc.proxy(ProxySelector.of(new InetSocketAddress(props.proxyHost(), props.proxyPort() == null ? 8080 : props.proxyPort())));
+        JdkClientHttpRequestFactory f = new JdkClientHttpRequestFactory(hc.build());
+        f.setReadTimeout(Duration.ofMillis(props.timeout()));
         RestClient.Builder b = RestClient.builder().requestFactory(f).baseUrl(props.baseUrl()).defaultHeader("Accept", MediaType.APPLICATION_JSON_VALUE);
         ServiceNowProperties.Auth a = props.auth();
         switch (a.type()) {
