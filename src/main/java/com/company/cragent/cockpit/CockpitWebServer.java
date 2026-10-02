@@ -4,7 +4,11 @@ import com.company.cragent.cockpit.CockpitModel.*;
 import com.company.cragent.config.CockpitProperties;
 import com.company.cragent.audit.AuditLog;
 import com.company.cragent.tools.IceTools;
+import com.company.cragent.model.ChangeDraft;
 import com.company.cragent.tools.ServiceNowTools;
+import com.company.cragent.tools.TemplateTools;
+import com.company.cragent.tools.ValidationTools;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
@@ -22,6 +26,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,16 +48,21 @@ public class CockpitWebServer {
     private final ObjectMapper json;
     private final ServiceNowTools sn;
     private final IceTools ice;
+    private final TemplateTools templates;
+    private final ValidationTools validation;
     private final RecordCache cache;
     private final AuditLog audit;
     private HttpServer server;
 
-    public CockpitWebServer(CockpitStore store, CockpitProperties props, ObjectMapper json, ServiceNowTools sn, IceTools ice, RecordCache cache, AuditLog audit) {
+    public CockpitWebServer(CockpitStore store, CockpitProperties props, ObjectMapper json, ServiceNowTools sn, IceTools ice,
+                            TemplateTools templates, ValidationTools validation, RecordCache cache, AuditLog audit) {
         this.store = store;
         this.props = props;
         this.json = json;
         this.sn = sn;
         this.ice = ice;
+        this.templates = templates;
+        this.validation = validation;
         this.cache = cache;
         this.audit = audit;
     }
@@ -90,6 +100,20 @@ public class CockpitWebServer {
             server.createContext("/api/close", ex -> post(ex, b -> store.closeDay(null, b.path("summary").asText(""), null)));
             // Records viewer. Cached copies of every CR / ICE record the tools touched; "live" fetches through the
             // interface and refreshes the copy. The page never needs the interface just to look at something.
+            // CR page: read live, edit + save (update-change), build a draft from a template, validate, create.
+            // Every POST here is a deliberate click, so it counts as the user's confirmation (confirmed=true).
+            server.createContext("/api/templates", ex -> respondJson(ex, templates.listTemplates()));
+            server.createContext("/api/change/update", ex -> post(ex, b -> sn.updateChange(b.path("number").asText(), fields(b.path("fields")), true)));
+            server.createContext("/api/change/draft", ex -> post(ex, b -> templates.buildDraft(b.path("template").asText(), b.path("servers").asText(""), b.path("start").asText(""), b.path("summary").asText(""))));
+            server.createContext("/api/change/validate", ex -> post(ex, b -> validation.validateDraft(new ChangeDraft(fields(b.path("fields")), tasks(b.path("tasks"))))));
+            server.createContext("/api/change/create", ex -> post(ex, b -> sn.createChange(new ChangeDraft(fields(b.path("fields")), tasks(b.path("tasks"))), true, b.path("taskId").asText(null))));
+            // ICE page: read live, edit + save, draft from a CR, create.
+            server.createContext("/api/ice/update", ex -> post(ex, b -> ice.updateIce(b.path("id").asText(), fields(b.path("fields")), true)));
+            server.createContext("/api/ice/draft", ex -> {
+                String n = query(ex).getOrDefault("number", "").trim();
+                try { respondJson(ex, ice.draftIce(n)); } catch (Exception e) { respondJson(ex, Map.of("error", String.valueOf(e.getMessage()))); }
+            });
+            server.createContext("/api/ice/create", ex -> post(ex, b -> ice.createIce(b.path("changeNumber").asText(), fields(b.path("fields")), true, b.path("taskId").asText(null))));
             server.createContext("/api/records", ex -> respondJson(ex, cache.list()));
             server.createContext("/api/record", ex -> {
                 Map<String, String> q = query(ex);
@@ -119,6 +143,16 @@ public class CockpitWebServer {
 
     @PreDestroy
     void stop() { if (server != null) server.stop(0); }
+
+    private Map<String, Object> fields(JsonNode node) {
+        if (node == null || !node.isObject()) return new LinkedHashMap<>();
+        return json.convertValue(node, new TypeReference<LinkedHashMap<String, Object>>() {});
+    }
+
+    private List<Map<String, Object>> tasks(JsonNode node) {
+        if (node == null || !node.isArray()) return new ArrayList<>();
+        return json.convertValue(node, new TypeReference<List<Map<String, Object>>>() {});
+    }
 
     /** Adds what else we know about a record: the cockpit task that owns it, and its counterpart (CR <-> ICE). */
     private void linked(Map<String, Object> m, String kind, String id) {

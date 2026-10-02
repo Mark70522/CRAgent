@@ -159,6 +159,12 @@ h1,h2,h3{margin:0}
 .hmeta{font-size:12px;color:var(--ink-3);display:flex;gap:10px;flex-wrap:wrap;margin-top:2px}
 .hst{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500}
 .hst.done{background:var(--good-soft);color:var(--good)} .hst.todo,.hst.doing{background:var(--warn-soft);color:var(--warn)} .hst.dropped{background:var(--surface-2);color:var(--ink-3)} .hst.waiting{background:var(--accent-soft);color:var(--accent)}
+.tb{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px} .tb .sp{flex:1} .tb .btn{padding:6px 12px;font-size:12.5px}
+.ed{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px 18px} .ed .f{display:flex;flex-direction:column;gap:4px} .ed .f.wide{grid-column:1/-1}
+.ed label{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3)} .ed input,.ed textarea,.ed select{font:inherit;font-size:13.5px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink);width:100%;box-sizing:border-box}
+.ed textarea{min-height:120px;line-height:1.5;resize:vertical} .ed input[readonly]{background:var(--surface-2);color:var(--ink-3)} .ed .f.changed input,.ed .f.changed textarea{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+table.ted{width:100%;border-collapse:collapse;font-size:12.5px} table.ted th{text-align:left;font-weight:500;color:var(--ink-3);padding:4px 6px;border-bottom:1px solid var(--line)} table.ted td{padding:2px 4px} table.ted input{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;width:100%;box-sizing:border-box;background:var(--surface)}
+.msg{margin-top:10px;padding:8px 12px;border-radius:8px;font-size:13px;background:var(--surface-2)} .msg.bad{background:var(--warn-soft);color:var(--warn)} .msg.good{background:var(--good-soft);color:var(--good)}
 .reclist{display:flex;flex-direction:column;gap:6px;max-height:70vh;overflow:auto}
 .rec{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;text-align:left;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer}
 .rec:hover{background:var(--surface-2)} .rec.on{border-color:var(--accent);background:var(--accent-soft)}
@@ -237,6 +243,8 @@ table.cr-t td.num{white-space:nowrap}
       <button data-view="knowledge"><span class="t">库</span>知识沉淀</button>
       <div class="nav-lbl" style="margin-top:14px">变更</div>
       <button data-view="change"><span class="t">CR</span>变更单</button>
+      <button data-view="ice"><span class="t">ICE</span>ICE 记录</button>
+      <button data-view="records"><span class="t">存</span>本地留存</button>
     </div>
     <div class="rail-foot">连续收尾 <b class="num" id="f-streak">0</b> 天<br>知识条目 <b class="num" id="f-know">0</b> 条<br>未完成任务 <b class="num" id="f-open">0</b> 项</div>
   </nav>
@@ -308,18 +316,35 @@ table.cr-t td.num{white-space:nowrap}
 
     <section class="view" id="v-change" hidden>
       <form class="cap" id="crform">
-        <input id="crnum" placeholder="单号:CHG0012345 或 ICE 记录号" aria-label="单号" autocomplete="off">
-        <button class="btn" type="submit" data-kind="change">读 CR</button>
-        <button class="btn ghost" type="button" id="icebtn" data-kind="ice">读 ICE</button>
+        <input id="crnum" placeholder="变更单号,如 CHG0012345" aria-label="变更单号" autocomplete="off">
+        <button class="btn" type="submit">读取</button>
+        <button class="btn ghost" type="button" id="crnewbtn">新建</button>
       </form>
-      <div class="hint">Copilot 读过、建过、改过的每一张单都在本地留了一份(cockpit/records/),这里直接看,不用再碰接口;「刷新」才会去接口取最新的。</div>
+      <div class="hint">读取走 get-change 接口并跑硬规则;「编辑」后「保存」走 update-change;「新建」从模板起草、校验、再走 create-change。每一步都是你点了才发。</div>
+      <div id="crnewpanel" hidden></div>
+      <div id="crout"><div class="empty">输单号读取,或者点「新建」。</div></div>
+    </section>
+
+    <section class="view" id="v-ice" hidden>
+      <form class="cap" id="iceform">
+        <input id="icenum" placeholder="ICE 记录号" aria-label="ICE 记录号" autocomplete="off">
+        <button class="btn" type="submit">读取</button>
+        <button class="btn ghost" type="button" id="icenewbtn">新建</button>
+      </form>
+      <div class="hint">读取走 get-ice;「编辑」后「保存」走 update-ice;「新建」输 CR 号,按 cr-agent.yml 的 from-change 算出字段,改完再走 create-ice。</div>
+      <div id="icenewpanel" hidden></div>
+      <div id="iceout"><div class="empty">输 ICE 号读取,或者点「新建」。</div></div>
+    </section>
+
+    <section class="view" id="v-records" hidden>
+      <div class="hint">Copilot 和这个页面读过、建过、改过的每一张单都在本地留了一份(cockpit/records/)。这里只看,不碰接口;要最新的点「从接口刷新」。</div>
       <div class="grid2" style="grid-template-columns:minmax(240px,320px) minmax(0,1fr)">
         <div class="card">
-          <div class="card-h"><h2>本地留存的单</h2><span class="meta" id="rec-meta"></span></div>
+          <div class="card-h"><h2>留存的单</h2><span class="meta" id="rec-meta"></span></div>
           <input class="ksearch" id="recq" placeholder="筛:单号、标题、状态" aria-label="筛选" style="margin-bottom:10px">
           <div class="reclist" id="reclist"></div>
         </div>
-        <div id="crout"><div class="empty">左边点一张单,或者在上面输单号读取。</div></div>
+        <div id="recout"><div class="empty">左边点一张单。</div></div>
       </div>
     </section>
 
@@ -347,7 +372,8 @@ table.cr-t td.num{white-space:nowrap}
   var S = null;
   var kinds = { decision:'决定', pitfall:'坑', learned:'学到', rule:'规则', fact:'事实', preference:'偏好' };
   var repeatName = { monthly:'每月', weekly:'每周', quarterly:'每季度' };
-  var titles = { morning:'早上好,先看看今天', day:'一边做,一边记', evening:'今天到这里,留下值得留的', knowledge:'你沉淀下来的', history:'做过的每一件事', change:'变更单' };
+  var titles = { morning:'早上好,先看看今天', day:'一边做,一边记', evening:'今天到这里,留下值得留的', knowledge:'你沉淀下来的', history:'做过的每一件事', change:'变更单', ice:'ICE 记录', records:'本地留存的单' };
+  var VIEWS = ['morning','day','evening','history','knowledge','change','ice','records'];
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function api(path, body){ return fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : undefined).then(function(r){ return r.json(); }); }
   function load(){ return api('/api/state').then(function(s){ S = s; render(); }); }
@@ -488,7 +514,9 @@ table.cr-t td.num{white-space:nowrap}
     document.querySelectorAll('.nav button').forEach(function(b){ if (b.dataset.view===v) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
     document.getElementById('vtitle').textContent = titles[v];
     if (v==='history') loadHistory();
-    if (v==='change') { loadRecords(); if (REC.id && !document.querySelector('#crout .card')) loadRecord(REC.kind, REC.id, false); }
+    if (v==='records') loadRecords();
+    if (v==='change' && !document.querySelector('#crout .card') && LAST.change) crLoad(LAST.change, false);
+    if (v==='ice' && !document.querySelector('#iceout .card') && LAST.ice) iceLoad(LAST.ice, false);
     try { localStorage.setItem('cockpit-view', v); } catch(e){}
   }
 
@@ -557,89 +585,251 @@ table.cr-t td.num{white-space:nowrap}
       box.querySelector('[data-no]').onclick = function(){ box.innerHTML = before; bindHistActions(box.parentNode); };
     }; });
   }
-  // ── change request viewer ──
+
+  // ── CR view / ICE view / records view ──
   var LONG = [['description','描述'],['justification','变更理由'],['implementation_plan','实施计划'],['risk_impact_analysis','风险与影响分析'],['backout_plan','回退方案'],['test_plan','测试计划']];
   var BASIC = [['type','类型'],['category','分类'],['risk','风险'],['impact','影响'],['priority','优先级'],['state','状态'],['approval','审批'],['cmdb_ci','配置项'],['assignment_group','负责组'],['assigned_to','负责人'],['requested_by','申请人'],['start_date','计划开始'],['end_date','计划结束'],['close_code','关闭代码'],['sys_updated_on','最近更新']];
-  var REC = { kind:'change', id:'' };
+  var LONGKEYS = LONG.map(function(p){ return p[0]; }), KNOWN = {}; BASIC.forEach(function(p){ KNOWN[p[0]] = p[1]; });
+  var LAST = { change:'', ice:'' };
+  try { LAST.change = localStorage.getItem('cockpit-last-cr') || ''; LAST.ice = localStorage.getItem('cockpit-last-ice') || ''; } catch(e){}
+  function remember(kind, id){ LAST[kind] = id; try { localStorage.setItem(kind==='ice'?'cockpit-last-ice':'cockpit-last-cr', id); } catch(e){} }
+  function post(path, body){ return api(path, body).then(function(r){ if (r && r.error) throw new Error(r.error); return r; }); }
+  function msg(el, text, cls){ el.innerHTML = '<div class="msg '+(cls||'')+'">'+esc(text)+'</div>'; }
+
+  // -- read-only pieces, shared by the three views
+  function cacheBar(r, mode){
+    var kind = r.kind, b = '<div class="cbar">';
+    if (r.fetchedAt) b += '<span>'+(r.action==='create'?'建于':r.action==='update'?'改于':'读于')+' <span class="num">'+esc(r.fetchedAt)+'</span>'+(r.firstSeen && r.firstSeen!==r.fetchedAt?' · 首次 <span class="num">'+esc(r.firstSeen)+'</span>':'')+(mode==='rec'?' · 本地副本':'')+'</span>';
+    if (r.task) b += '<span>任务 <a href="#history" class="num" data-task="'+esc(r.task.id)+'">'+esc(r.task.id)+'</a> '+esc(r.task.title)+'</span>';
+    if (kind==='change') b += r.iceId ? '<span>ICE <a href="#ice" class="num" data-go="ice:'+esc(r.iceId)+'">'+esc(r.iceId)+'</a></span>' : '<span class="rbad">未登 ICE</span>';
+    else if (r.changeNumber) b += '<span>CR <a href="#change" class="num" data-go="change:'+esc(r.changeNumber)+'">'+esc(r.changeNumber)+'</a></span>';
+    b += '<span class="sp"></span>';
+    if (mode==='cr' || mode==='ice') b += '<button type="button" class="btn" data-act="edit">编辑</button>';
+    if (mode==='rec') b += '<button type="button" class="btn ghost" data-go="'+esc(kind)+':'+esc(r.id)+'">在 '+(kind==='ice'?'ICE':'CR')+' 页打开</button>';
+    b += '<button type="button" class="btn ghost" data-act="refresh">从接口刷新</button></div>';
+    return b;
+  }
+  function basicGrid(f, skip){
+    return Object.keys(f).filter(function(k){ return f[k] && LONGKEYS.indexOf(k) < 0 && skip.indexOf(k) < 0; })
+      .map(function(k){ var v = String(f[k]); return '<div class="cr-f"><div class="k">'+esc(KNOWN[k]||k)+'</div><div class="v'+(/date|updated|_on$/.test(k)?' num':'')+'">'+esc(v.length>120?v.slice(0,120)+'…':v)+'</div></div>'; }).join('');
+  }
+  function longSecs(f){
+    return LONG.filter(function(p){ return f[p[0]] !== undefined; }).map(function(p){ return '<div class="cr-sec"><h3>'+p[1]+'</h3><pre'+(f[p[0]]?'':' class="empty"')+'>'+(f[p[0]]?esc(f[p[0]]):'(空)')+'</pre></div>'; }).join('') || '<div class="empty">接口返回里没有描述类字段(description / implementation_plan …);字段名不同就在 field-map 里对一下</div>';
+  }
+  function tasksTable(tasks){
+    var cols = tasks.length ? Object.keys(tasks[0]) : [];
+    return tasks.length ? '<div class="cr-wrap"><table class="cr-t"><tr>'+cols.map(function(c){return '<th>'+esc(c)+'</th>';}).join('')+'</tr>'+tasks.map(function(t){ return '<tr>'+cols.map(function(c){ return '<td class="'+(/date|order/.test(c)?'num':'')+'">'+esc(t[c]||'')+'</td>'; }).join('')+'</tr>'; }).join('')+'</table></div>' : '<div class="empty">没有 task(或 get-change 的 tasks 路径没配)</div>';
+  }
+  function vioList(vios){
+    return vios.length ? '<div class="vio">'+vios.map(function(v){ return '<div class="vio-row"><span class="id">'+esc(v.ruleId)+'</span><span class="sev '+esc(v.severity)+'">'+esc(v.severity)+'</span><span>'+esc(v.message)+(v.suggestion?'<span class="sug">建议:'+esc(v.suggestion)+'</span>':'')+'</span></div>'; }).join('')+'</div>' : '<div class="empty">全部硬规则通过</div>';
+  }
+  function rawSec(r){ return '<div class="card"><div class="cr-sec"><h3>接口原始返回</h3><pre style="font-family:var(--mono);font-size:12px">'+esc(JSON.stringify(r.raw, null, 2))+'</pre></div></div>'; }
+  function changeHtml(r, mode){
+    var f = r.fields || {}, tasks = r.tasks || [], vios = r.violations || [];
+    var chips = '<span class="pill '+(r.passed?'good':'bad')+'"><span class="dot"></span>硬规则 '+(r.passed?'通过':vios.filter(function(v){return v.severity==='error';}).length+' 处不合规')+'</span>'
+      + (f.approval ? '<span class="pill '+({approved:'good',rejected:'bad'}[String(f.approval).toLowerCase()]||'')+'"><span class="dot"></span>审批 '+esc(f.approval)+'</span>' : '')
+      + (f.state ? '<span class="pill"><span class="dot"></span>'+esc(f.state)+'</span>' : '');
+    return '<div class="card"><div class="cr-head"><div><div class="cr-num">'+esc(f.number||r.number||r.id)+'</div><div class="cr-title">'+esc(f.short_description||'')+'</div></div><div class="cr-chips">'+chips+'</div></div>'+cacheBar(r, mode)
+      + '<div class="cr-grid" style="margin-top:16px">'+basicGrid(f, ['short_description','number'])+'</div></div>'
+      + '<div class="grid2" style="grid-template-columns:minmax(0,1.4fr) minmax(280px,1fr)"><div class="card">'+longSecs(f)+'</div>'
+      + '<div class="card"><div class="card-h"><h2>硬规则校验</h2><span class="meta">'+vios.length+' 条</span></div>'+vioList(vios)+'</div></div>'
+      + '<div class="card"><div class="card-h"><h2>Tasks</h2><span class="meta">'+tasks.length+' 个</span></div>'+tasksTable(tasks)+'</div>' + rawSec(r);
+  }
+  function iceHtml(r, mode){
+    var f = r.fields || {};
+    var grid = Object.keys(f).filter(function(k){ return f[k] !== '' && f[k] != null; }).map(function(k){ var v = String(f[k]); return '<div class="cr-f"><div class="k">'+esc(k)+'</div><div class="v'+(/date|time|_on$|_at$/i.test(k)?' num':'')+'">'+esc(v.length>160?v.slice(0,160)+'…':v)+'</div></div>'; }).join('') || '<div class="empty">接口没返回字段</div>';
+    return '<div class="card"><div class="cr-head"><div><div class="cr-num">ICE '+esc(r.id)+'</div><div class="cr-title">'+esc(r.title||'')+'</div></div></div>'+cacheBar(r, mode)+'<div class="cr-grid" style="margin-top:16px">'+grid+'</div></div>' + rawSec(r);
+  }
+  function bindCommon(root, r, onEdit, onRefresh){
+    root.querySelectorAll('[data-task]').forEach(function(a){ a.onclick = function(e){ e.preventDefault(); document.getElementById('hq').value = a.dataset.task; show('history'); loadHistory(); }; });
+    root.querySelectorAll('[data-go]').forEach(function(a){ a.onclick = function(e){ e.preventDefault(); var p = a.dataset.go.split(':'), id = p.slice(1).join(':'); if (p[0]==='ice') { show('ice'); iceLoad(id, false); } else { show('change'); crLoad(id, false); } }; });
+    var e = root.querySelector('[data-act="edit"]'); if (e && onEdit) e.onclick = onEdit;
+    var f = root.querySelector('[data-act="refresh"]'); if (f && onRefresh) f.onclick = onRefresh;
+  }
+
+  // -- editors
+  function fieldRows(f, opts){
+    opts = opts || {}; var ro = opts.readonly || [];
+    return '<div class="ed">' + Object.keys(f).map(function(k){
+      var v = f[k] == null ? '' : String(f[k]), wide = LONGKEYS.indexOf(k) >= 0 || v.length > 80 || v.indexOf('\n') >= 0;
+      var lbl = '<label>'+esc(KNOWN[k]||k)+(KNOWN[k]?' <small>'+esc(k)+'</small>':'')+'</label>';
+      return '<div class="f'+(wide?' wide':'')+'" data-key="'+esc(k)+'">'+lbl+(wide ? '<textarea data-field="'+esc(k)+'">'+esc(v)+'</textarea>' : '<input data-field="'+esc(k)+'" value="'+esc(v)+'"'+(ro.indexOf(k)>=0?' readonly':'')+'>')+'</div>';
+    }).join('') + '</div>';
+  }
+  function readFieldRows(root){ var o = {}; root.querySelectorAll('[data-field]').forEach(function(i){ o[i.dataset.field] = i.value; }); return o; }
+  function taskRows(tasks){
+    var cols = []; tasks.forEach(function(t){ Object.keys(t).forEach(function(k){ if (cols.indexOf(k) < 0) cols.push(k); }); });
+    if (!cols.length) cols = ['short_description','order','assignment_group','planned_start_date','planned_end_date'];
+    var rows = tasks.map(function(t){ return '<tr>'+cols.map(function(c){ return '<td><input data-col="'+esc(c)+'" value="'+esc(t[c]==null?'':t[c])+'"></td>'; }).join('')+'<td><button type="button" class="btn ghost" data-delrow>×</button></td></tr>'; }).join('');
+    return '<table class="ted" data-cols="'+esc(cols.join(','))+'"><tr>'+cols.map(function(c){return '<th>'+esc(c)+'</th>';}).join('')+'<th></th></tr>'+rows+'</table><div class="tb"><button type="button" class="btn ghost" data-addrow>+ 加一个 task</button></div>';
+  }
+  function bindTaskRows(root){
+    root.querySelectorAll('[data-delrow]').forEach(function(b){ b.onclick = function(){ b.closest('tr').remove(); }; });
+    var add = root.querySelector('[data-addrow]'); if (add) add.onclick = function(){
+      var tbl = root.querySelector('table.ted'), cols = tbl.dataset.cols.split(','), tr = document.createElement('tr');
+      tr.innerHTML = cols.map(function(c){ return '<td><input data-col="'+esc(c)+'"></td>'; }).join('')+'<td><button type="button" class="btn ghost" data-delrow>×</button></td>';
+      tbl.appendChild(tr); bindTaskRows(root);
+    };
+  }
+  function readTaskRows(root){
+    var out = []; root.querySelectorAll('table.ted tr').forEach(function(tr){ var ins = tr.querySelectorAll('input[data-col]'); if (!ins.length) return; var t = {}, any = false; ins.forEach(function(i){ t[i.dataset.col] = i.value; if (i.value) any = true; }); if (any) out.push(t); });
+    return out;
+  }
+  function markChanged(root, original){
+    root.querySelectorAll('[data-field]').forEach(function(i){ i.oninput = function(){ i.closest('.f').classList.toggle('changed', i.value !== String(original[i.dataset.field]==null?'':original[i.dataset.field])); }; });
+  }
+  function diff(root, original){ var o = readFieldRows(root), d = {}; Object.keys(o).forEach(function(k){ if (o[k] !== String(original[k]==null?'':original[k])) d[k] = o[k]; }); return d; }
+
+  // -- CR view
+  function crLoad(number, live){
+    var out = document.getElementById('crout');
+    out.innerHTML = '<div class="empty">'+(live?'从接口读取中 …':'读取中 …')+'</div>';
+    api('/api/record?kind=change&id='+encodeURIComponent(number)+(live?'&live=1':'')).then(function(r){
+      if (r.error) { out.innerHTML = '<div class="empty">'+esc(r.error)+(live?'':' <button type="button" class="btn" style="margin-left:8px" onclick="crLoad(\''+esc(number)+'\', true)">从接口读</button>')+'</div>'; return; }
+      remember('change', number); crShow(r);
+    });
+  }
+  function crShow(r){
+    var out = document.getElementById('crout');
+    out.innerHTML = changeHtml(r, 'cr');
+    bindCommon(out, r, function(){ crEdit(r); }, function(){ crLoad(r.id, true); });
+  }
+  function crEdit(r){
+    var out = document.getElementById('crout'), f = r.fields || {};
+    out.innerHTML = '<div class="card"><div class="cr-head"><div><div class="cr-num">'+esc(r.id)+'</div><div class="cr-title">编辑 · 改了的字段高亮,保存只发改过的</div></div></div>'
+      + '<div style="margin-top:14px">'+fieldRows(f, {readonly:['number','sys_id']})+'</div>'
+      + '<div class="tb"><span class="hint">task 不在 update-change 里,这里不改</span><span class="sp"></span><button type="button" class="btn" data-act="save">保存到 ServiceNow</button><button type="button" class="btn ghost" data-act="cancel">取消</button></div><div id="crmsg"></div></div>';
+    markChanged(out, f);
+    out.querySelector('[data-act="cancel"]').onclick = function(){ crShow(r); };
+    out.querySelector('[data-act="save"]').onclick = function(){
+      var d = diff(out, f), m = document.getElementById('crmsg');
+      if (!Object.keys(d).length) { msg(m, '没有改动', ''); return; }
+      msg(m, '保存中 … 改了 '+Object.keys(d).length+' 个字段:'+Object.keys(d).join(', '), '');
+      post('/api/change/update', {number:r.id, fields:d}).then(function(res){ crLoad(r.id, false); }).catch(function(e){ msg(m, '保存失败:'+e.message, 'bad'); });
+    };
+  }
+  function crNew(){
+    var p = document.getElementById('crnewpanel'); p.hidden = false;
+    p.innerHTML = '<div class="card"><div class="card-h"><h2>新建变更单</h2><span class="meta">先起草,改好校验过再创建</span></div>'
+      + '<div class="ed"><div class="f"><label>模板</label><select id="nw-tpl"><option>读取中…</option></select></div><div class="f"><label>服务器(逗号分隔)</label><input id="nw-srv" placeholder="srv-app-01, srv-app-02"></div><div class="f"><label>计划开始</label><input id="nw-start" placeholder="2026-10-11 01:00:00"></div><div class="f wide"><label>一句话摘要</label><input id="nw-sum" placeholder="2026-10 Windows monthly security patches"></div></div>'
+      + '<div class="tb"><button type="button" class="btn" id="nw-draft">生成草稿</button><button type="button" class="btn ghost" id="nw-close">收起</button></div><div id="nw-msg"></div><div id="nw-editor"></div></div>';
+    api('/api/templates').then(function(ts){ document.getElementById('nw-tpl').innerHTML = ts.map(function(t){ return '<option value="'+esc(t.name)+'">'+esc(t.name)+' · '+esc(t.description||'')+'</option>'; }).join('') || '<option value="">(knowledge/templates 里没有模板)</option>'; });
+    document.getElementById('nw-close').onclick = function(){ p.hidden = true; p.innerHTML = ''; };
+    document.getElementById('nw-draft').onclick = function(){
+      var m = document.getElementById('nw-msg'); msg(m, '起草中 …', '');
+      post('/api/change/draft', {template:document.getElementById('nw-tpl').value, servers:document.getElementById('nw-srv').value, start:document.getElementById('nw-start').value, summary:document.getElementById('nw-sum').value})
+        .then(function(d){ m.innerHTML = (d.notes||[]).length ? '<div class="msg">'+d.notes.map(esc).join('<br>')+'</div>' : ''; crDraftEditor(d.draft.fields||{}, d.draft.tasks||[]); })
+        .catch(function(e){ msg(m, '起草失败:'+e.message, 'bad'); });
+    };
+  }
+  function crDraftEditor(fields, tasks){
+    var ed = document.getElementById('nw-editor');
+    ed.innerHTML = '<div class="sec-lbl" style="margin-top:14px">字段 · 把 &lt;TODO: …&gt; 都换成实际内容</div>'+fieldRows(fields, {})
+      + '<div class="sec-lbl" style="margin-top:14px">Tasks</div>'+taskRows(tasks)
+      + '<div class="tb"><button type="button" class="btn ghost" id="nw-val">校验</button><button type="button" class="btn" id="nw-create">创建到 ServiceNow</button></div><div id="nw-vio"></div>';
+    bindTaskRows(ed);
+    document.getElementById('nw-val').onclick = function(){
+      var v = document.getElementById('nw-vio'); msg(v, '校验中 …', '');
+      post('/api/change/validate', {fields:readFieldRows(ed), tasks:readTaskRows(ed)}).then(function(r){ v.innerHTML = '<div class="msg '+(r.passed?'good':'bad')+'">'+(r.passed?'硬规则通过':r.errorCount+' 个 error,'+r.warningCount+' 个 warning')+'</div>'+vioList(r.violations||[]); }).catch(function(e){ msg(v, e.message, 'bad'); });
+    };
+    document.getElementById('nw-create').onclick = function(){
+      var v = document.getElementById('nw-vio');
+      if (!confirm('确定创建到 ServiceNow?创建后提交审批仍由你完成。')) return;
+      msg(v, '创建中 …', '');
+      post('/api/change/create', {fields:readFieldRows(ed), tasks:readTaskRows(ed)}).then(function(r){
+        document.getElementById('crnewpanel').hidden = true; document.getElementById('crnewpanel').innerHTML = '';
+        document.getElementById('crnum').value = r.number || ''; if (r.number) remember('change', r.number);
+        crShow(r);
+      }).catch(function(e){ msg(v, '没有创建:'+e.message, 'bad'); });
+    };
+  }
+  document.getElementById('crform').addEventListener('submit', function(e){ e.preventDefault(); var n = document.getElementById('crnum').value.trim(); if (n) crLoad(n, true); });
+  document.getElementById('crnewbtn').addEventListener('click', crNew);
+
+  // -- ICE view
+  function iceLoad(id, live){
+    var out = document.getElementById('iceout');
+    out.innerHTML = '<div class="empty">'+(live?'从接口读取中 …':'读取中 …')+'</div>';
+    api('/api/record?kind=ice&id='+encodeURIComponent(id)+(live?'&live=1':'')).then(function(r){
+      if (r.error) { out.innerHTML = '<div class="empty">'+esc(r.error)+(live?'':' <button type="button" class="btn" style="margin-left:8px" onclick="iceLoad(\''+esc(id)+'\', true)">从接口读</button>')+'</div>'; return; }
+      remember('ice', id); iceShow(r);
+    });
+  }
+  function iceShow(r){
+    var out = document.getElementById('iceout');
+    out.innerHTML = iceHtml(r, 'ice');
+    bindCommon(out, r, function(){ iceEdit(r); }, function(){ iceLoad(r.id, true); });
+  }
+  function iceEdit(r){
+    var out = document.getElementById('iceout'), f = r.fields || {};
+    out.innerHTML = '<div class="card"><div class="cr-head"><div><div class="cr-num">ICE '+esc(r.id)+'</div><div class="cr-title">编辑 · 保存只发改过的字段</div></div></div><div style="margin-top:14px">'+fieldRows(f, {readonly:['id']})+'</div>'
+      + '<div class="tb"><span class="sp"></span><button type="button" class="btn" data-act="save">保存到 ICE</button><button type="button" class="btn ghost" data-act="cancel">取消</button></div><div id="icemsg"></div></div>';
+    markChanged(out, f);
+    out.querySelector('[data-act="cancel"]').onclick = function(){ iceShow(r); };
+    out.querySelector('[data-act="save"]').onclick = function(){
+      var d = diff(out, f), m = document.getElementById('icemsg');
+      if (!Object.keys(d).length) { msg(m, '没有改动', ''); return; }
+      msg(m, '保存中 …', '');
+      post('/api/ice/update', {id:r.id, fields:d}).then(function(){ iceLoad(r.id, false); }).catch(function(e){ msg(m, '保存失败:'+e.message, 'bad'); });
+    };
+  }
+  function iceNew(){
+    var p = document.getElementById('icenewpanel'); p.hidden = false;
+    p.innerHTML = '<div class="card"><div class="card-h"><h2>为一张 CR 登记 ICE</h2><span class="meta">字段按 cr-agent.yml 的 ice.from-change 从 CR 算出</span></div>'
+      + '<div class="ed"><div class="f"><label>变更单号</label><input id="in-cr" placeholder="CHG0012345" value="'+esc(LAST.change)+'"></div></div>'
+      + '<div class="tb"><button type="button" class="btn" id="in-draft">算出字段</button><button type="button" class="btn ghost" id="in-close">收起</button></div><div id="in-msg"></div><div id="in-editor"></div></div>';
+    document.getElementById('in-close').onclick = function(){ p.hidden = true; p.innerHTML = ''; };
+    document.getElementById('in-draft').onclick = function(){
+      var m = document.getElementById('in-msg'), cr = document.getElementById('in-cr').value.trim(); if (!cr) return;
+      msg(m, '读取 CR 并计算 …', '');
+      api('/api/ice/draft?number='+encodeURIComponent(cr)).then(function(d){
+        if (d.error) { msg(m, d.error, 'bad'); return; }
+        m.innerHTML = (d.hint ? '<div class="msg bad">'+esc(d.hint)+'</div>' : '') + ((d.emptyFields||[]).length ? '<div class="msg">空着的字段:'+esc(d.emptyFields.join(', '))+',CR 里没有对应内容,自己填</div>' : '');
+        var ed = document.getElementById('in-editor');
+        var fields = d.fields && Object.keys(d.fields).length ? d.fields : {title:'', change_number:cr};
+        ed.innerHTML = fieldRows(fields, {}) + '<div class="tb"><button type="button" class="btn ghost" id="in-add">+ 加一个字段</button><span class="sp"></span><button type="button" class="btn" id="in-create">创建到 ICE</button></div><div id="in-vio"></div>';
+        document.getElementById('in-add').onclick = function(){ var k = prompt('字段名(接口要的名字)'); if (!k) return; var f = readFieldRows(ed); f[k] = ''; ed.querySelector('.ed').outerHTML = fieldRows(f, {}); };
+        document.getElementById('in-create').onclick = function(){
+          var v = document.getElementById('in-vio');
+          if (!confirm('确定在 ICE 创建?')) return;
+          msg(v, '创建中 …', '');
+          post('/api/ice/create', {changeNumber:cr, fields:readFieldRows(ed)}).then(function(r){ p.hidden = true; p.innerHTML = ''; document.getElementById('icenum').value = r.id || ''; if (r.id) remember('ice', r.id); iceShow(r); }).catch(function(e){ msg(v, '没有创建:'+e.message, 'bad'); });
+        };
+      });
+    };
+  }
+  document.getElementById('iceform').addEventListener('submit', function(e){ e.preventDefault(); var n = document.getElementById('icenum').value.trim(); if (n) iceLoad(n, true); });
+  document.getElementById('icenewbtn').addEventListener('click', iceNew);
+
+  // -- records view: read-only copies
+  var RECSEL = { kind:'', id:'' };
   function loadRecords(){
     api('/api/records').then(function(rows){
       var q = (document.getElementById('recq').value||'').trim().toLowerCase();
       var list = rows.filter(function(r){ return !q || [r.id, r.title, r.state, r.kind, r.changeNumber].join(' ').toLowerCase().indexOf(q) >= 0; });
       document.getElementById('rec-meta').textContent = rows.length ? rows.length+' 张' : '';
       document.getElementById('reclist').innerHTML = list.length ? list.map(function(r){
-        var on = r.kind===REC.kind && r.id===REC.id;
+        var on = r.kind===RECSEL.kind && r.id===RECSEL.id;
         return '<button type="button" class="rec'+(on?' on':'')+'" data-kind="'+esc(r.kind)+'" data-id="'+esc(r.id)+'">'
           + '<span class="rk '+esc(r.kind)+'">'+(r.kind==='ice'?'ICE':'CR')+'</span>'
           + '<span><div class="rid num">'+esc(r.id)+(r.passed===false?' <i class="rbad">不合规</i>':'')+'</div><div class="rt">'+esc(r.title||'')+'</div>'
           + '<div class="rm">'+(r.state?esc(r.state)+' · ':'')+(r.changeNumber?esc(r.changeNumber)+' · ':'')+esc((r.fetchedAt||'').slice(5,16))+'</div></span></button>';
-      }).join('') : '<div class="empty">'+(rows.length?'没有匹配的':'还没有。在 Copilot 里说"看一下 CHG…",读过的单就会留在这里。')+'</div>';
-      document.querySelectorAll('.rec').forEach(function(b){ b.onclick = function(){ loadRecord(b.dataset.kind, b.dataset.id, false); }; });
+      }).join('') : '<div class="empty">'+(rows.length?'没有匹配的':'还没有。读过、建过、改过的单会留在这里。')+'</div>';
+      document.querySelectorAll('.rec').forEach(function(b){ b.onclick = function(){ recShow(b.dataset.kind, b.dataset.id); }; });
     });
   }
-  function loadRecord(kind, id, live){
-    REC = { kind:kind, id:id };
-    var out = document.getElementById('crout');
-    out.innerHTML = '<div class="empty">'+(live?'从接口读取中 …':'读取中 …')+'</div>';
-    api('/api/record?kind='+encodeURIComponent(kind)+'&id='+encodeURIComponent(id)+(live?'&live=1':'')).then(function(r){
-      if (r.error) { out.innerHTML = '<div class="empty">'+esc(r.error)+(live?'':'<br><button class="btn" style="margin-top:10px" onclick="document.getElementById(\'crnum\').value=\''+esc(id)+'\'">去接口读</button>')+'</div>'; return; }
-      try { localStorage.setItem('cockpit-rec', kind+':'+id); } catch(e){}
-      if (kind === 'ice') renderIce(r); else renderChange(r);
+  function recShow(kind, id){
+    RECSEL = { kind:kind, id:id };
+    var out = document.getElementById('recout'); out.innerHTML = '<div class="empty">读取中 …</div>';
+    api('/api/record?kind='+encodeURIComponent(kind)+'&id='+encodeURIComponent(id)).then(function(r){
+      if (r.error) { out.innerHTML = '<div class="empty">'+esc(r.error)+'</div>'; return; }
+      out.innerHTML = kind==='ice' ? iceHtml(r, 'rec') : changeHtml(r, 'rec');
+      bindCommon(out, r, null, function(){ api('/api/record?kind='+encodeURIComponent(kind)+'&id='+encodeURIComponent(id)+'&live=1').then(function(){ recShow(kind, id); loadRecords(); }); });
       loadRecords();
     });
   }
-  function cacheBar(r){
-    return '<div class="cbar"><span>'+(r.action==='create'?'建于':r.action==='update'?'改于':'读于')+' <span class="num">'+esc(r.fetchedAt||'')+'</span>'+(r.firstSeen && r.firstSeen!==r.fetchedAt?' · 首次 <span class="num">'+esc(r.firstSeen)+'</span>':'')+' · 本地副本</span>'
-      + (r.task ? '<span>任务 <a href="#history" class="num" data-task="'+esc(r.task.id)+'">'+esc(r.task.id)+'</a> '+esc(r.task.title)+'</span>' : '')
-      + (r.kind==='change' ? (r.iceId ? '<span>ICE <a href="#change" class="num" data-rec="ice:'+esc(r.iceId)+'">'+esc(r.iceId)+'</a></span>' : '<span class="rbad">未登 ICE</span>') : (r.changeNumber ? '<span>CR <a href="#change" class="num" data-rec="change:'+esc(r.changeNumber)+'">'+esc(r.changeNumber)+'</a></span>' : ''))
-      + '<span class="sp"></span><button type="button" class="btn ghost" id="recfresh">从接口刷新</button></div>';
-  }
-  function afterRender(r){
-    var b = document.getElementById('recfresh'); if (b) b.onclick = function(){ loadRecord(r.kind, r.id, true); };
-    document.querySelectorAll('[data-rec]').forEach(function(a){ a.onclick = function(e){ e.preventDefault(); var p = a.dataset.rec.split(':'); loadRecord(p[0], p.slice(1).join(':'), false); }; });
-    document.querySelectorAll('[data-task]').forEach(function(a){ a.onclick = function(e){ e.preventDefault(); document.getElementById('hq').value = a.dataset.task; show('history'); loadHistory(); }; });
-  }
-  function renderIce(r){
-    var out = document.getElementById('crout'), f = r.fields || {};
-    var grid = Object.keys(f).filter(function(k){ return f[k] !== '' && f[k] != null; }).map(function(k){ var v = String(f[k]); return '<div class="cr-f"><div class="k">'+esc(k)+'</div><div class="v'+(/date|time|_on$|_at$/i.test(k)?' num':'')+'">'+esc(v.length>160?v.slice(0,160)+'…':v)+'</div></div>'; }).join('') || '<div class="empty">接口没返回字段</div>';
-    out.innerHTML = '<div class="card"><div class="cr-head"><div><div class="cr-num">ICE '+esc(r.id)+'</div><div class="cr-title">'+esc(r.title||'')+'</div></div></div>'+cacheBar(r)
-      + '<div class="cr-grid" style="margin-top:16px">'+grid+'</div></div>'
-      + '<div class="card"><div class="cr-sec"><h3>接口原始返回</h3><pre style="font-family:var(--mono);font-size:12px">'+esc(JSON.stringify(r.raw, null, 2))+'</pre></div></div>';
-    afterRender(r);
-  }
-  function renderChange(r){
-    var out = document.getElementById('crout');
-    {
-      var f = r.fields || {}, tasks = r.tasks || [], vios = r.violations || [];
-      var longKeys = LONG.map(function(p){ return p[0]; });
-      var chips = '<span class="pill '+(r.passed?'good':'bad')+'"><span class="dot"></span>硬规则 '+(r.passed?'通过':vios.filter(function(v){return v.severity==='error';}).length+' 处不合规')+'</span>'
-        + (f.approval ? '<span class="pill '+({approved:'good',rejected:'bad'}[String(f.approval).toLowerCase()]||'')+'"><span class="dot"></span>审批 '+esc(f.approval)+'</span>' : '')
-        + (f.state ? '<span class="pill"><span class="dot"></span>'+esc(f.state)+'</span>' : '');
-      // known names get a Chinese label; every other field your interface returns is shown with its own name
-      var known = {}; BASIC.forEach(function(p){ known[p[0]] = p[1]; });
-      var basic = Object.keys(f).filter(function(k){ return f[k] && longKeys.indexOf(k) < 0 && k !== 'short_description' && k !== 'number'; })
-        .map(function(k){ var v = String(f[k]); return '<div class="cr-f"><div class="k">'+esc(known[k]||k)+'</div><div class="v'+(/date|updated|_on$/.test(k)?' num':'')+'">'+esc(v.length>120?v.slice(0,120)+'…':v)+'</div></div>'; }).join('');
-      var longs = LONG.filter(function(p){ return f[p[0]] !== undefined; }).map(function(p){ return '<div class="cr-sec"><h3>'+p[1]+'</h3><pre'+(f[p[0]]?'':' class="empty"')+'>'+(f[p[0]]?esc(f[p[0]]):'(空)')+'</pre></div>'; }).join('') || '<div class="empty">接口返回里没有描述类字段(description / implementation_plan …);字段名不同的话在 BASIC/LONG 里对一下</div>';
-      var cols = tasks.length ? Object.keys(tasks[0]) : [];
-      var tbl = tasks.length ? '<div class="cr-wrap"><table class="cr-t"><tr>'+cols.map(function(c){return '<th>'+esc(c)+'</th>';}).join('')+'</tr>'+tasks.map(function(t){ return '<tr>'+cols.map(function(c){ return '<td class="'+(/date|order/.test(c)?'num':'')+'">'+esc(t[c]||'')+'</td>'; }).join('')+'</tr>'; }).join('')+'</table></div>' : '<div class="empty">没有 task(或 get-change 的 tasks 路径没配)</div>';
-      var vio = vios.length ? '<div class="vio">'+vios.map(function(v){ return '<div class="vio-row"><span class="id">'+esc(v.ruleId)+'</span><span class="sev '+esc(v.severity)+'">'+esc(v.severity)+'</span><span>'+esc(v.message)+(v.suggestion?'<span class="sug">建议:'+esc(v.suggestion)+'</span>':'')+'</span></div>'; }).join('')+'</div>' : '<div class="empty">全部硬规则通过</div>';
-      var raw = '<div class="cr-sec"><h3>接口原始返回</h3><pre style="font-family:var(--mono);font-size:12px">'+esc(JSON.stringify(r.raw, null, 2))+'</pre></div>';
-      out.innerHTML =
-        '<div class="card"><div class="cr-head"><div><div class="cr-num">'+esc(f.number||r.number||r.id)+'</div><div class="cr-title">'+esc(f.short_description||'')+'</div></div><div class="cr-chips">'+chips+'</div></div>'+cacheBar(r)
-        + '<div class="cr-grid" style="margin-top:16px">'+basic+'</div></div>'
-        + '<div class="grid2" style="grid-template-columns:minmax(0,1.4fr) minmax(280px,1fr)">'
-        +   '<div class="card">'+longs+'</div>'
-        +   '<div class="card"><div class="card-h"><h2>硬规则校验</h2><span class="meta">'+vios.length+' 条</span></div>'+vio+'</div>'
-        + '</div>'
-        + '<div class="card"><div class="card-h"><h2>Tasks</h2><span class="meta">'+tasks.length+' 个</span></div>'+tbl+'</div>'
-        + '<div class="card">'+raw+'</div>';
-    }
-    afterRender(r);
-  }
-  function readFromForm(kind){ var n = document.getElementById('crnum').value.trim(); if (n) loadRecord(kind, n, true); }
-  document.getElementById('crform').addEventListener('submit', function(e){ e.preventDefault(); readFromForm('change'); });
-  document.getElementById('icebtn').addEventListener('click', function(){ readFromForm('ice'); });
   var recT; document.getElementById('recq').addEventListener('input', function(){ clearTimeout(recT); recT = setTimeout(loadRecords, 200); });
-  try { var lastRec = localStorage.getItem('cockpit-rec'); if (lastRec) { var p = lastRec.split(':'); REC = { kind:p[0], id:p.slice(1).join(':') }; } } catch(e){}
+  window.crLoad = crLoad; window.iceLoad = iceLoad;
 
   var histT;
   document.getElementById('hq').addEventListener('input', function(){ clearTimeout(histT); histT = setTimeout(loadHistory, 250); });
@@ -684,9 +874,9 @@ table.cr-t td.num{white-space:nowrap}
   // #morning / #day / #evening / #history / #knowledge / #change in the URL wins (open_cockpit uses it), else the last view
   var v = 'morning'; try { v = localStorage.getItem('cockpit-view') || 'morning'; } catch(e){}
   var hv = (location.hash || '').slice(1);
-  if (['morning','day','evening','history','knowledge','change'].indexOf(hv) >= 0) v = hv;
+  if (VIEWS.indexOf(hv) >= 0) v = hv;
   show(v);
-  window.addEventListener('hashchange', function(){ var h = (location.hash||'').slice(1); if (['morning','day','evening','history','knowledge','change'].indexOf(h) >= 0) show(h); });
+  window.addEventListener('hashchange', function(){ var h = (location.hash||'').slice(1); if (VIEWS.indexOf(h) >= 0) show(h); });
   load().catch(function(){ document.getElementById('brief').innerHTML = '<div class="empty">连不上本地服务,确认 MCP server 在跑。</div>'; });
   setInterval(function(){ if (!document.hidden) load(); }, 20000);
 })();

@@ -71,7 +71,15 @@ ice:
 
 对应工具 `get_ice`、`create_ice`、`update_ice`,建和改要确认。create-cr 建完 CR 会接着提议登 ICE,ICE 号挂在任务上和 CHG 号并排显示。不配 `ice:` 段就是关着的,`status` 会说明,工具会拒绝。要自己写 Java 就 `ice.client: company`,填 `CompanyIceClient.java` 的三个 TODO。
 
-**本地留存**:CR 和 ICE 每张被读过、建过、改过的单都在 `cockpit/records/{change,ice}/<单号>.json` 留一份(字段、task、硬规则结果、接口原始返回、什么时候读的)。页面「变更单」视图左边列出所有留存的单,点开看全文,CR 和它的 ICE、所属任务互相有链接;只有点「从接口刷新」或输单号读取才会去碰接口。
+**页面上的三个视图**(左栏「变更」):
+
+| 视图 | 能做什么 | 走哪个接口 |
+|---|---|---|
+| 变更单 | 输单号读取;「编辑」改字段,「保存」只发改过的;「新建」选模板、填服务器和时间、生成草稿、改、「校验」、「创建」 | get-change / update-change / create-change |
+| ICE 记录 | 输 ICE 号读取;编辑保存;「新建」输 CR 号,按 `from-change` 算出字段,改完创建 | get-ice / update-ice / create-ice |
+| 本地留存 | 列出读过、建过、改过的每张单,只看不碰接口;CR、ICE、所属任务互相链接;「从接口刷新」才取最新 | 无(刷新时才用 get) |
+
+页面上点保存、创建就是你的确认,和 Copilot 里说"创建"一样走同一套闸(硬规则 error 不清零不建),每次点击都进审计日志。留存文件在 `cockpit/records/{change,ice}/<单号>.json`:字段、task、硬规则结果、接口原始返回、读取时间。
 
 接口怎么实现,二选一(`servicenow.client`):
 
