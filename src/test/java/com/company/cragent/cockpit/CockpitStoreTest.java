@@ -156,6 +156,40 @@ class CockpitStoreTest {
     }
 
     @Test
+    void rememberStoresOnceAndSkipsWhatIsAlreadyKnown() {
+        CockpitStore s = store();
+        s.saveKnowledge("CAB 审批", "影响范围要有业务方名字", "CAB 找的是名字不是字数。", null, null);
+
+        var r1 = s.remember("CAB 要求影响范围写业务应用名和时长", "rule", "老板说影响范围必须写业务名", null);
+        assertThat(r1.status()).isEqualTo("stored");
+        assertThat(r1.note().auto).isTrue();
+        assertThat(r1.note().kind).isEqualTo("rule");
+        assertThat(r1.note().source).contains("老板说");
+
+        // same thing said again in another conversation: not stored twice
+        var r2 = s.remember("CAB要求影响范围写业务应用名和时长", "rule", null, null);
+        assertThat(r2.status()).isEqualTo("duplicate");
+        assertThat(r2.duplicateOf()).startsWith("today");
+
+        // already in the knowledge files: skipped, with the file named
+        var r3 = s.remember("CAB 找的是名字不是字数。", "fact", null, null);
+        assertThat(r3.status()).isEqualTo("duplicate");
+        assertThat(r3.duplicateOf()).startsWith("knowledge/");
+
+        // unknown kind falls back to fact; a task id lands in the task's notes too
+        s.addTasks(List.of(t("CCS PROD 补丁", null, "P2")), "paste");
+        var r4 = s.remember("CCS PROD 有 4 台 Windows 2019", "whatever", "用户说 CCS PROD 有 4 台", "T-0001");
+        assertThat(r4.note().kind).isEqualTo("fact");
+        assertThat(s.taskNotes("T-0001")).contains("[fact, auto] CCS PROD");
+        assertThat(s.remember("   ", "fact", null, null).status()).isEqualTo("empty");
+
+        // all of them show up at evening close as candidates
+        Day d = s.closeDay(null, "x", null);
+        assertThat(d.notes).hasSize(2);
+        assertThat(d.notes).allMatch(n -> n.auto && !n.saved);
+    }
+
+    @Test
     void searchCoversDayLogsAndEnglishPrefixes() {
         CockpitStore s = store();
         Note n = s.capture("2026-09-30", "learned: CAB looks for names, not word count", null, null);

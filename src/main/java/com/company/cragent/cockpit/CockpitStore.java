@@ -249,6 +249,40 @@ public class CockpitStore {
         return n;
     }
 
+    /** Result of remember: stored, or why not. */
+    public record Remembered(String status, Note note, String duplicateOf) {}
+
+    /**
+     * What Copilot picked out of the conversation on its own. Goes into today's notes flagged auto, so the
+     * evening close shows it for confirmation like any other note. Skipped when the same thing is already
+     * in today's notes or in the knowledge files, so repeated conversations do not pile up copies.
+     */
+    public synchronized Remembered remember(String text, String kind, String source, String taskId) {
+        String clean = stripKindPrefix(text == null ? "" : text.trim());
+        if (clean.isBlank()) return new Remembered("empty", null, null);
+        Day today = day(null);
+        for (Note n : today.notes) if (similar(n.text, clean)) return new Remembered("duplicate", n, "today " + n.t);
+        for (Map<String, String> hit : search(clean, 3)) {
+            String lines = hit.getOrDefault("lines", "");
+            if (lines.toLowerCase().contains(clean.toLowerCase()) || similar(firstLine(lines), clean))
+                return new Remembered("duplicate", null, hit.get("file"));
+        }
+        Note n = new Note();
+        n.t = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+        n.kind = normalizeKind(kind, text);
+        if (n.kind == null) n.kind = "fact";
+        n.text = clean;
+        n.taskId = blankToNull(taskId);
+        n.auto = true;
+        n.source = source == null || source.isBlank() ? null : source.length() > 200 ? source.substring(0, 200) + "…" : source;
+        today.notes.add(n);
+        saveDay(today);
+        if (n.taskId != null) appendTaskNote(n.taskId, n.t + " [" + n.kind + ", auto] " + n.text);
+        return new Remembered("stored", n, null);
+    }
+
+    private static String firstLine(String s) { int i = s.indexOf('\n'); return i < 0 ? s : s.substring(0, i); }
+
     public synchronized Day closeDay(String date, String summary, List<String> tomorrow) {
         Day day = day(date);
         day.summary = summary;
@@ -528,6 +562,9 @@ public class CockpitStore {
             case "决定", "decision" -> "decision";
             case "坑", "pitfall", "bug" -> "pitfall";
             case "学到", "learned", "lesson" -> "learned";
+            case "规则", "rule", "requirement" -> "rule";
+            case "事实", "fact", "info" -> "fact";
+            case "偏好", "习惯", "preference" -> "preference";
             default -> null;
         };
     }

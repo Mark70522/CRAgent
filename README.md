@@ -120,6 +120,8 @@ yaml 模式的规则:
 | `T-0003 周日凌晨 1 点执行` | 记下执行时间;执行前两天早安会提醒检查变更单和审批,过了没标完成会问你跑了没 |
 | `给 CCS PROD 打补丁的 CR 建一下` | create-cr 会认出对应任务,建好的 CHG 号自动挂到任务上 |
 
+**聊天里的关键信息会自动留下**:你不用说"记一笔"。Copilot 每次回复结束时,把对话里以后还成立的东西(老板的要求、某台机器某个服务的事实、坑、决定、你的习惯)用 `remember` 存进当天的随手记,标"Copilot 自动记的"并附原话;已经知道的会跳过。晚上"收工"时逐条让你确认:规则进 `knowledge/rules/`,事实和习惯进 `knowledge/`,不要的就留在当天日志里不再提。工具面板里把 `remember` 设成 Always allow,它只写本地文件。
+
 任务只记文本里有的事实:工时没说就空着,Copilot 猜的会标「AI 估」;团队邮件里别人的活会先问你是不是你的;贴进来的任务如果以前做过,它会把上次的耗时、CHG 号和坑一并说出来。`cockpit/` 是你的个人数据,已在 `.gitignore` 里。
 
 ---
@@ -134,7 +136,7 @@ yaml 模式的规则:
 
 | 只读,可以自动批准 | 会写东西,保留确认 |
 |---|---|
-| `status` `check_config` `probe`(send=false)`draft_ice` `get_change` `lookup_ci` `lookup_service` `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` `read_rules` `list_examples` `read_example` `eval_rules` `get_ice` `get_day` `list_tasks` `task_notes` `task_history` `search_knowledge` `read_knowledge` `cockpit_url` `open_cockpit` | `create_change` `update_change` `create_ice` `update_ice`(代码里还要 confirmed=true)· `probe`(send=true)`save_fixture` · `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` · `add_tasks` `update_task` `plan_day` `capture_note` `close_day` `save_knowledge` |
+| `status` `check_config` `probe`(send=false)`draft_ice` `remember`(只写当天随手记,晚上还要确认)`get_change` `lookup_ci` `lookup_service` `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` `read_rules` `list_examples` `read_example` `eval_rules` `get_ice` `get_day` `list_tasks` `task_notes` `task_history` `search_knowledge` `read_knowledge` `cockpit_url` `open_cockpit` | `create_change` `update_change` `create_ice` `update_ice`(代码里还要 confirmed=true)· `probe`(send=true)`save_fixture` · `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` · `add_tasks` `update_task` `plan_day` `capture_note` `close_day` `save_knowledge` |
 
 **健康检查**:在 Copilot 里说 `status`,或命令行 `java scripts/CallTool.java status`,一次看到接口、清单、规则、范例、回归结果、页面地址、审计日志位置。
 

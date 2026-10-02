@@ -65,10 +65,12 @@ public final class CockpitModel {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Note {
         public String t;              // HH:mm
-        public String kind;           // decision | pitfall | learned | null
+        public String kind;           // decision | pitfall | learned | rule | fact | preference | null
         public String text;
         public String taskId;
         public boolean saved;         // already merged into knowledge
+        public boolean auto;          // Copilot picked it out of the conversation on its own (remember tool); confirm at evening-close
+        public String source;         // the user's words it came from, short
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

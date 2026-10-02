@@ -153,6 +153,32 @@ public class CockpitTools {
         return store.capture(date, text, kind, taskId);
     }
 
+    public record MemoryItem(
+            @ToolParam(description = "The fact in one sentence, in the user's words, with the concrete number / name / step") String text,
+            @ToolParam(description = "rule (what approvers / the boss expect) | fact (about a system, server, service, person) | pitfall | decision | learned | preference (how the user wants things done)") String kind,
+            @ToolParam(description = "The user's sentence it came from, short", required = false) String source,
+            @ToolParam(description = "Task id it belongs to, if clear", required = false) String taskId) {}
+
+    @Tool(name = "remember", description = """
+            Keep what the conversation just revealed, without being asked: a rule the boss stated, a fact about a
+            system or server, a pitfall, a decision, a lesson, a preference of the user. Call it at the end of a reply,
+            once, with every item worth keeping; nothing to keep = do not call. Items land in today's notes marked
+            auto and are confirmed at evening close before they become knowledge or rules; duplicates of what is
+            already known are skipped and reported. Do not store questions, guesses, or things the tools returned.""")
+    public List<Map<String, Object>> remember(@ToolParam(description = "Items worth keeping") List<MemoryItem> items) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (MemoryItem it : items == null ? List.<MemoryItem>of() : items) {
+            CockpitStore.Remembered r = store.remember(it.text(), it.kind(), it.source(), it.taskId());
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("status", r.status());
+            m.put("text", it.text());
+            if (r.note() != null && r.note().kind != null) m.put("kind", r.note().kind);
+            if (r.duplicateOf() != null) m.put("duplicateOf", r.duplicateOf());
+            out.add(m);
+        }
+        return out;
+    }
+
     @Tool(name = "close_day", description = """
             Close the day: stores the one-line summary and the proposed task ids for tomorrow, marks the day closed
             and records stats (planned/done/estimated minutes/notes). Returns the day plus digestCandidates:

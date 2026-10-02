@@ -22,12 +22,20 @@ Goal: nothing learned today is lost, and tomorrow starts pre-planned.
 ## 2. Keep what matters
 
 1. Go through today's notes (`get_day.day.notes`). Candidates are notes with a kind (decision /
-   pitfall / learned) and any plain note that clearly states a fact worth reusing.
+   pitfall / learned / rule / fact / preference) and any plain note that clearly states a fact worth
+   reusing. Notes with `auto=true` were picked out of conversations by you during the day: show them
+   with their `source` so the user sees where each came from, and treat them exactly like the others -
+   nothing is kept without a yes.
 2. For each candidate propose: **topic** (an existing one from `knowledgeTopics` when it fits, else a
    new short name), **title** (one line) and **content** (1-5 sentences, the user's wording,
-   plus the concrete number or step that makes it reusable).
+   plus the concrete number or step that makes it reusable). Kind decides where it goes:
+   - `rule` → the learn-rules skill: `add_hard_rule` if checkable, else `add_soft_rule`; also
+     `save_knowledge` under topic "审批要求" so the wording is kept.
+   - `preference` → `save_knowledge` under topic "我的习惯"; create-cr and the other skills read it.
+   - everything else → `save_knowledge` under the fitting topic.
 3. Show the list; the user says which to keep. `save_knowledge` for each confirmed one with
-   `noteIndex` so the note is marked saved. Do not save anything the user did not confirm.
+   `noteIndex` so the note is marked saved. Do not save anything the user did not confirm; what they
+   decline stays in the day log only and is never proposed again (it will be a duplicate).
 4. If a pitfall changes how a template or rule should be (e.g. the os-patch task order), say so and
    offer to change `knowledge/templates/*.yaml` or add a rule via the learn-rules skill.
 
