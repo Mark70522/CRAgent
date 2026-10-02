@@ -29,7 +29,7 @@ cr-agent(一个 Java 进程,Spring Boot 3.5 + Spring AI MCP,stdio)
 ## 原则
 
 1. **不预设 ServiceNow 的形状,只预留三个动作。** 读(get-change)、建(create-change)、改(update-change),每个都是 `cr-agent.yml` 里的一条 endpoint 描述:方法、路径、query、body 模板、返回里记录的位置。程序里没有表名、列名、路径;接口变了改 yml。
-2. **字段名不翻译。** 模板里写什么名字,草稿就是什么名字,直接发给接口。规则引擎按同样的名字查。少一层映射就少一处对不上。
+2. **字段名只在边界翻译一次。** 模板、规则、范例、页面用标准名;接口叫什么由 `field-map` 说,`YamlServiceNowClient` / `YamlIceClient` 发出去改名、收回来改回。没有 `field-map` 就是原样。知识库永远不用跟着接口改。
 3. **规则是文件。** 硬规则 yaml(必填、枚举、正则、长度、时间顺序、task 数量、窗口)每次校验重读;软规则 md 由 Copilot 判断。老板的要求落在文件里,有 changelog。
 4. **每个事实有来源。** 草稿字段标注来自清单、模板、历史还是用户;没有来源的留空问人。
 5. **写操作有闸。** 创建必须 `confirmed=true` 且硬规则无 error;只创建,提交审批是人。
@@ -80,9 +80,10 @@ create-change 的 body:不写模板 = 草稿字段平铺;写模板可用 `${fiel
 
 | 组 | 工具 |
 |---|---|
-| 状态 | `status`(接口、清单、规则、范例、回归、页面、审计一次看全) |
+| 状态 | `status`(接口、配置体检、清单、规则、范例、回归、页面、审计一次看全) |
+| 接入 | `check_config`(yml 体检)`probe`(渲染 / 真发一个端点,看完整返回)`save_fixture`(真实返回存成回放样本,`FixtureReplayTest` 验证 yml) |
 | ServiceNow | `get_change` `create_change` `update_change`(建和改都要 confirmed=true) |
-| ICE | `get_ice` `create_ice` `update_ice`(建改要 confirmed=true;`ice:` 段没配就拒绝) |
+| ICE | `draft_ice`(按 `ice.from-change` 从 CR 算出 ICE 字段)`get_ice` `create_ice` `update_ice`(建改要 confirmed=true;`ice:` 段没配就拒绝) |
 | 清单 | `lookup_ci` `lookup_service` |
 | 模板 / 校验 | `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` |
 | 规则与范例 | `read_rules` `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` `list_examples` `read_example` `eval_rules` |

@@ -4,6 +4,7 @@ import com.company.cragent.audit.AuditLog;
 import com.company.cragent.audit.AuditedToolCallback;
 import com.company.cragent.tools.CockpitTools;
 import com.company.cragent.tools.IceTools;
+import com.company.cragent.tools.IntegrationTools;
 import com.company.cragent.tools.InventoryTools;
 import com.company.cragent.tools.KnowledgeTools;
 import com.company.cragent.tools.ServiceNowTools;
@@ -23,10 +24,10 @@ import java.util.Arrays;
 public class McpToolConfig {
 
     @Bean
-    public ToolCallbackProvider crTools(StatusTools status, InventoryTools inventory, ServiceNowTools serviceNow, IceTools ice, TemplateTools template,
-                                        ValidationTools validation, KnowledgeTools knowledge, CockpitTools cockpit, AuditLog audit) {
+    public ToolCallbackProvider crTools(StatusTools status, IntegrationTools integration, InventoryTools inventory, ServiceNowTools serviceNow, IceTools ice,
+                                        TemplateTools template, ValidationTools validation, KnowledgeTools knowledge, CockpitTools cockpit, AuditLog audit) {
         ToolCallback[] raw = MethodToolCallbackProvider.builder()
-                .toolObjects(status, inventory, serviceNow, ice, template, validation, knowledge, cockpit)
+                .toolObjects(status, integration, inventory, serviceNow, ice, template, validation, knowledge, cockpit)
                 .build().getToolCallbacks();
         ToolCallback[] audited = Arrays.stream(raw).map(t -> (ToolCallback) new AuditedToolCallback(t, audit)).toArray(ToolCallback[]::new);
         return () -> audited;

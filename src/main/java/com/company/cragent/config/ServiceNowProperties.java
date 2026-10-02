@@ -33,9 +33,15 @@ public record ServiceNowProperties(
         Integer timeoutMs,
         /** yaml (default: endpoints described below) or company (your CompanyServiceNowClient). */
         String client,
-        Map<String, Endpoint> endpoints) implements HttpApi {
+        Map<String, Endpoint> endpoints,
+        /**
+         * Optional: canonical name (used by templates, rules, examples, the page) -> the name your interface uses,
+         * e.g. {@code short_description: title}. Applied once at the boundary, both directions. Empty = same names.
+         */
+        Map<String, String> fieldMap) implements HttpApi {
 
     public String client() { return client == null || client.isBlank() ? "yaml" : client.trim().toLowerCase(); }
+    public Map<String, String> fieldMap() { return fieldMap == null ? Map.of() : fieldMap; }
 
     public record Auth(String type, String tokenEnv, String token, String user, String passwordEnv, String password) {
         public String type() { return type == null || type.isBlank() ? "none" : type.trim().toLowerCase(); }

@@ -1,6 +1,7 @@
 package com.company.cragent.ice;
 
 import com.company.cragent.config.IceProperties;
+import com.company.cragent.servicenow.FieldMap;
 import com.company.cragent.servicenow.SnHttp;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -21,10 +22,12 @@ public class YamlIceClient implements IceClient {
 
     private final IceEndpoints endpoints;
     private final IceProperties props;
+    private final FieldMap names;
 
     public YamlIceClient(IceEndpoints endpoints, IceProperties props) {
         this.endpoints = endpoints;
         this.props = props;
+        this.names = new FieldMap(props.fieldMap());
     }
 
     @Override public boolean configured() { return endpoints.configured(); }
@@ -42,7 +45,7 @@ public class YamlIceClient implements IceClient {
 
     @Override
     public IceRecord create(String changeNumber, Map<String, Object> fields) {
-        Map<String, Object> f = fields == null ? Map.of() : fields;
+        Map<String, Object> f = names.out(fields == null ? Map.of() : fields);
         Map<String, Object> params = new LinkedHashMap<>(f);
         params.put("number", changeNumber);
         params.put("fields", f);
@@ -52,7 +55,7 @@ public class YamlIceClient implements IceClient {
 
     @Override
     public IceRecord update(String iceId, Map<String, Object> fields) {
-        Map<String, Object> f = fields == null ? Map.of() : fields;
+        Map<String, Object> f = names.out(fields == null ? Map.of() : fields);
         Map<String, Object> params = new LinkedHashMap<>(f);
         params.put("id", iceId);
         params.put("fields", f);
@@ -60,8 +63,8 @@ public class YamlIceClient implements IceClient {
     }
 
     private IceRecord record(String id, JsonNode rec) {
-        Map<String, String> flat = SnHttp.flatten(rec);
-        String i = id != null ? id : flat.getOrDefault(props.idField(), "");
-        return new IceRecord(i, flat, rec);
+        Map<String, String> raw = SnHttp.flatten(rec);
+        String i = id != null ? id : raw.getOrDefault(props.idField(), "");
+        return new IceRecord(i, names.in(raw), rec);
     }
 }

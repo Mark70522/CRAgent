@@ -31,9 +31,19 @@ public record IceProperties(
         String client,
         /** Key in the returned record that holds the ICE id; default id. */
         String idField,
-        Map<String, ServiceNowProperties.Endpoint> endpoints) implements HttpApi {
+        Map<String, ServiceNowProperties.Endpoint> endpoints,
+        /** Optional: canonical ICE field name -> the name the interface uses. */
+        Map<String, String> fieldMap,
+        /**
+         * How ICE fields are derived from a change request: ICE field -> template over the CR's (canonical) fields,
+         * e.g. {@code title: "${short_description}"}, {@code window: "${start_date} - ${end_date}"}.
+         * draft_ice renders this; the user confirms; create_ice sends it.
+         */
+        Map<String, String> fromChange) implements HttpApi {
 
     @Override public String client() { return client == null || client.isBlank() ? "yaml" : client.trim().toLowerCase(); }
+    @Override public Map<String, String> fieldMap() { return fieldMap == null ? Map.of() : fieldMap; }
+    public Map<String, String> fromChange() { return fromChange == null ? Map.of() : fromChange; }
     @Override public ServiceNowProperties.Auth auth() { return auth == null ? new ServiceNowProperties.Auth(null, null, null, null, null, null) : auth; }
     @Override public Map<String, String> headers() { return headers == null ? Map.of() : headers; }
     @Override public Map<String, ServiceNowProperties.Endpoint> endpoints() { return endpoints == null ? Map.of() : endpoints; }

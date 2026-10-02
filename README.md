@@ -100,7 +100,7 @@ yaml 模式的规则:
 
 ## 3. 字段名和规则
 
-草稿里的字段名来自模板 `knowledge/templates/*.yaml`,**写成你们接口要的名字**。自带的三个模板用的是标准名(short_description、backout_plan……),接口字段不同就改模板里的键名,程序不做翻译。硬规则 `knowledge/rules/hard-rules.yaml` 里的 `field` 要和模板一致。
+草稿里的字段名来自模板 `knowledge/templates/*.yaml`,用的是标准名(short_description、backout_plan……),硬规则 `knowledge/rules/hard-rules.yaml` 里的 `field` 和模板一致。接口字段名不同时**不改模板和规则**,在 `cr-agent.yml` 的 `field-map` 里写对照,程序只在接口边界改一次名。
 
 规则和范例都是文件:老板提一条新要求,改一行文件就生效,不改代码不重启。
 
@@ -134,15 +134,30 @@ yaml 模式的规则:
 
 | 只读,可以自动批准 | 会写东西,保留确认 |
 |---|---|
-| `status` `get_change` `lookup_ci` `lookup_service` `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` `read_rules` `list_examples` `read_example` `eval_rules` `get_ice` `get_day` `list_tasks` `task_notes` `task_history` `search_knowledge` `read_knowledge` `cockpit_url` `open_cockpit` | `create_change` `update_change` `create_ice` `update_ice`(代码里还要 confirmed=true)· `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` · `add_tasks` `update_task` `plan_day` `capture_note` `close_day` `save_knowledge` |
+| `status` `check_config` `probe`(send=false)`draft_ice` `get_change` `lookup_ci` `lookup_service` `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` `read_rules` `list_examples` `read_example` `eval_rules` `get_ice` `get_day` `list_tasks` `task_notes` `task_history` `search_knowledge` `read_knowledge` `cockpit_url` `open_cockpit` | `create_change` `update_change` `create_ice` `update_ice`(代码里还要 confirmed=true)· `probe`(send=true)`save_fixture` · `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` · `add_tasks` `update_task` `plan_day` `capture_note` `close_day` `save_knowledge` |
 
 **健康检查**:在 Copilot 里说 `status`,或命令行 `java scripts/CallTool.java status`,一次看到接口、清单、规则、范例、回归结果、页面地址、审计日志位置。
 
-## 6. 到公司后的顺序
+## 6. 到公司后的顺序(接口参数和返回还没定,就按这个来)
 
-1. `cr-agent.yml` 填 `base-url`、认证、`get-change` 一个接口。`java scripts/CallTool.java status` 看配置读到没有,再 `java scripts/CallTool.java get_change "{\"number\":\"真实单号\"}"`,返回和页面上一致就通了。
-2. 页面「变更单」里看同一张单,底部"接口原始返回"告诉你字段叫什么;对着改模板的键名和规则的 `field`。
-3. 配 `create-change` 和 `update-change`,账号先只给读权限,跑 create-cr 看草稿;满意了再给写权限。
-4. 过审的好单用 `save_example` 存进 `knowledge/examples/`,以后的草稿照着写。
+接口的形状全在 `cr-agent.yml`,程序里不写死;三样东西让它接得快:
+
+| 东西 | 干什么 | 怎么用 |
+|---|---|---|
+| `check_config` | 不发请求,检查 yml:端点名齐不齐、`${占位符}` 写没写错、`result` 填没填、环境变量设没设、`field-map` / `from-change` 对不对 | Copilot 里说 `检查配置`,或 `status` 里看 `configCheck` |
+| `probe` | 试一个端点。不发时只渲染:方法、完整 URL、header、body、认证从哪来;发了返回**完整原始响应**,并告诉你 `result` 路径取到了什么、`tasks` 取到几个 | `probe servicenow get-change {"number":"CHG…"}`,先 `send=false` 看请求,对了再 `send=true` |
+| `field-map` | 接口字段名和标准名不一样时,只在 yml 里写对照,模板、规则、范例、页面一行不改 | `servicenow.field-map` / `ice.field-map`,见示例 |
+| `ice.from-change` | ICE 字段怎么从 CR 来,写成模板;`draft_ice CHG…` 每次算出一样的结果给你确认 | 见示例 |
+| `save_fixture` | 把一张真单的原始返回存进 `knowledge/fixtures/`,`mvn test` 回放它验证 yml 还能解析 | 读过一张单后说 `save_fixture change CHG…` |
+
+顺序:
+
+1. `cr-agent.yml` 填 `base-url`、认证,先只写 `get-change`。`检查配置` 清零 problems。
+2. `probe servicenow get-change {"number":"真单号"}` 先不发看请求对不对,再发。对着返回填 `result`、`tasks`,字段名不一样就填 `field-map`。再 probe 一次直到 `resultFound=true`、`resultFields` 里有 `short_description`/`description`/`start_date`/`end_date`(或映射后的名字)。
+3. `看一下 CHG…`,页面「变更单」里看字段齐不齐;`save_fixture change CHG…` 存样本,`mvn test` 过。
+4. 同样方式过 `create-change`、`update-change`(账号先只给读权限,跑 create-cr 看草稿,满意再给写权限),再过 ICE 三个接口和 `from-change`。
+5. 过审的好单用 `save_example` 存进 `knowledge/examples/`,以后的草稿照着写。
+
+硬规则里的 `field`、模板里的键名、页面标签始终用标准名(`short_description`、`description`、`start_date`、`end_date`、`cmdb_ci`、`assignment_group`…),接口那边叫什么由 `field-map` 负责。
 
 出错看 `logs/cr-agent.log`。详细设计见 [DESIGN.md](DESIGN.md)。

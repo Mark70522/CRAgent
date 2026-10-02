@@ -56,10 +56,15 @@ public class EndpointClient {
         return m;
     }
 
-    /** Executes an endpoint and returns the node at its {@code result} path (the whole response when result is empty). */
-    public JsonNode call(String endpoint, Map<String, Object> params) {
-        Endpoint ep = props.endpoints().get(endpoint);
-        if (ep == null) throw new ServiceNowException("No endpoint named '" + endpoint + "' in cr-agent.yml. Configured: " + props.endpoints().keySet());
+    public HttpApi api() { return props; }
+    public SnHttp http() { return http; }
+
+    /** A request as it would go out: what `probe` shows before sending. headers are the per-endpoint ones only. */
+    public record Rendered(String endpoint, String method, String url, Map<String, String> headers, String body) {}
+
+    /** Renders path, query, per-endpoint headers and body for an endpoint without sending anything. */
+    public Rendered render(String endpoint, Map<String, Object> params) {
+        Endpoint ep = endpoint(endpoint);
         Map<String, Object> p = params == null ? Map.of() : params;
 
         UriComponentsBuilder b = UriComponentsBuilder.fromPath(renderText(ep.path(), p));
@@ -71,17 +76,33 @@ public class EndpointClient {
         if (method == HttpMethod.POST || method == HttpMethod.PUT || method == HttpMethod.PATCH)
             body = ep.body() == null || ep.body().isBlank() ? toJson(p) : renderJson(ep.body(), p);
 
-        JsonNode root = ep.headers().isEmpty() ? http.exchange(method, uri, body) : exchangeWithHeaders(method, uri, body, ep, p);
+        Map<String, String> h = new LinkedHashMap<>();
+        ep.headers().forEach((k, v) -> h.put(k, renderText(v, p)));
+        String base = props.baseUrl() == null ? "" : props.baseUrl();
+        return new Rendered(endpoint, ep.method(), base + uri, h, body);
+    }
+
+    /** Sends the rendered request and returns the whole response, untouched by {@code result}. */
+    public JsonNode callRaw(String endpoint, Map<String, Object> params) {
+        Rendered r = render(endpoint, params);
+        String uri = r.url().substring((props.baseUrl() == null ? "" : props.baseUrl()).length());
+        HttpMethod method = HttpMethod.valueOf(r.method());
+        return r.headers().isEmpty() ? http.exchange(method, uri, r.body()) : http.exchange(method, uri, r.body(), r.headers());
+    }
+
+    /** Executes an endpoint and returns the node at its {@code result} path (the whole response when result is empty). */
+    public JsonNode call(String endpoint, Map<String, Object> params) {
+        Endpoint ep = endpoint(endpoint);
+        JsonNode root = callRaw(endpoint, params);
         JsonNode out = SnHttp.path(root, ep.result());
         if (out.isMissingNode()) throw new ServiceNowException("Response of '" + endpoint + "' has nothing at result path '" + ep.result() + "'. Response starts: " + SnHttp.head(root.toString()));
         return out;
     }
 
-    private JsonNode exchangeWithHeaders(HttpMethod method, String uri, String body, Endpoint ep, Map<String, Object> p) {
-        // per-endpoint headers are rare; render them and append as a header-carrying request through SnHttp
-        Map<String, String> h = new LinkedHashMap<>();
-        ep.headers().forEach((k, v) -> h.put(k, renderText(v, p)));
-        return http.exchange(method, uri, body, h);
+    private Endpoint endpoint(String name) {
+        Endpoint ep = props.endpoints().get(name);
+        if (ep == null) throw new ServiceNowException("No endpoint named '" + name + "' in cr-agent.yml. Configured: " + props.endpoints().keySet());
+        return ep;
     }
 
     // ------------------------------------------------------------------ rendering

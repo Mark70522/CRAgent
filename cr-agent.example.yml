@@ -41,6 +41,16 @@ servicenow:
       # body: '{"request": ${fields}}'
       result: data
 
+  # ---- 字段名对照(可选): 左边是程序内部的标准名(模板、规则、范例、页面都用它), 右边是你们接口的名字。
+  #      只在接口边界改名, 发出去改成右边, 收回来改回左边。接口字段名和标准名一样就不用写。
+  # field-map:
+  #   short_description: title
+  #   description: detail
+  #   start_date: planned_start
+  #   end_date: planned_end
+  #   cmdb_ci: ci_name
+  #   assignment_group: team
+
 # ---- ICE: CR 还要在 ICE 里登记一份, 预留两个接口: 建 / 改。不用就整段删掉(status 会显示未配置, 工具会拒绝)。
 #      写法和 servicenow 一样, 可以是另一个地址、另一套认证; 密码用自己的环境变量名, 别和 SN 的混。
 # ice:
@@ -65,6 +75,15 @@ servicenow:
 #       method: PUT
 #       path: /ice/${id}
 #       result: data
+#   # field-map:                 # 同 servicenow.field-map, ICE 自己的一套
+#   #   title: subject
+#   # ICE 字段怎么从 CR 来: 左边 ICE 字段, 右边用 CR 的标准字段名拼。draft_ice 按这个算好给你确认, 每次一样。
+#   from-change:
+#     title: "${short_description}"
+#     change_number: "${number}"
+#     window: "${start_date} - ${end_date}"
+#     scope: "${cmdb_ci}"
+#     owner_group: "${assignment_group}"
 
 # ---- 服务器清单: 你们的 Excel ----
 inventory:

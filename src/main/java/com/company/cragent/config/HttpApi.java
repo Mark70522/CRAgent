@@ -17,4 +17,6 @@ public interface HttpApi {
     boolean configured();
     /** yaml or company. */
     String client();
+    /** Optional: canonical field name (templates, rules, page) -> name the interface uses. Empty = same names. */
+    Map<String, String> fieldMap();
 }

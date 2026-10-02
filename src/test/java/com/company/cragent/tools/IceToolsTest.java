@@ -11,6 +11,7 @@ import com.company.cragent.ice.IceEndpoints;
 import com.company.cragent.ice.IceHttp;
 import com.company.cragent.ice.IceRecord;
 import com.company.cragent.ice.YamlIceClient;
+import com.company.cragent.validation.RuleEngine;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -47,12 +48,33 @@ class IceToolsTest {
     RecordCache cache;
     IceTools tools;
 
+    ServiceNowTools snTools;
+
     @BeforeEach
     void setUp() {
         CockpitProperties props = new CockpitProperties(tmp, 0, false);
         cockpit = new CockpitStore(props, new ObjectMapper());
         cache = new RecordCache(props, new ObjectMapper());
-        tools = new IceTools(ice, cockpit, cache);
+        snTools = new ServiceNowTools(new ServiceNowToolsTest.RecordingClient(), new RuleEngine(Path.of("knowledge/rules/hard-rules.yaml")), cockpit, cache);
+        IceProperties iceProps = new IceProperties(null, null, null, null, null, null, null, null, null, null,
+                Map.of("title", "${short_description}", "window", "${start_date} - ${end_date}", "cr", "${number}", "owner", "${assigned_to}"));
+        tools = new IceTools(ice, cockpit, cache, iceProps, snTools, new ObjectMapper());
+    }
+
+    @Test
+    void draftIceDerivesFieldsFromTheChange() {
+        snTools.createChange(ServiceNowToolsTest.goodDraft(), true, null);   // now cached as CHG0099
+        Map<String, Object> d = tools.draftIce("CHG0099");
+        @SuppressWarnings("unchecked") Map<String, String> f = (Map<String, String>) d.get("fields");
+        assertThat(f).containsEntry("title", "[PATCH] srv-app-01 - 2026-10 Windows monthly security patches")
+                     .containsEntry("window", "2026-10-11 01:00:00 - 2026-10-11 05:00:00")
+                     .containsEntry("cr", "CHG0099")
+                     .containsEntry("owner", "");
+        assertThat((List<String>) d.get("emptyFields")).containsExactly("owner");
+        assertThat(d).doesNotContainKey("hint");
+
+        // not cached and not readable -> the error from the interface, not a silent empty draft
+        assertThatThrownBy(() -> tools.draftIce("CHG0000")).hasMessageContaining("not found");
     }
 
     @Test
@@ -125,7 +147,8 @@ class IceToolsTest {
                 null, null, null, null, null, "iceId",
                 Map.of("get-ice", new ServiceNowProperties.Endpoint("GET", "/ice/${id}", null, null, null, "data", null, null),
                        "create-ice", new ServiceNowProperties.Endpoint("POST", "/ice", null, null, "{\"cr\": ${number}, \"data\": ${fields}}", "data", null, null),
-                       "update-ice", new ServiceNowProperties.Endpoint("PUT", "/ice/${id}", null, null, null, "data", null, null)));
+                       "update-ice", new ServiceNowProperties.Endpoint("PUT", "/ice/${id}", null, null, null, "data", null, null)),
+                null, null);
         ObjectMapper json = new ObjectMapper();
         YamlIceClient client = new YamlIceClient(new IceEndpoints(props, new IceHttp(props, json), json), props);
 

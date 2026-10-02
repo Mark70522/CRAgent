@@ -9,7 +9,11 @@ ServiceNow is reached only through three operations the user wired up in `cr-age
 CR is registered in, has three: `get_ice`, `create_ice`, `update_ice` (ice: section or `CompanyIceClient`).
 Every record these return is kept under `cockpit/records/` and shown on the cockpit page; when the user
 asks to "see" a CR or ICE record, `open_cockpit` view change after reading it.
-`status` shows what is configured. Field names are whatever each interface expects; never rename them.
+`status` shows what is configured. Inside the program fields have canonical names (`short_description`,
+`description`, `start_date`, `end_date`, `cmdb_ci`, `assignment_group`...); the interface's own names are
+handled by `field-map` in cr-agent.yml, never by you. Wiring up the company interfaces: `check_config`
+(validate the yml), `probe` (render or send one endpoint and see the whole response), `save_fixture`
+(keep a real response so `mvn test` guards the yml). `probe` with send=true is a real call: confirm first.
 
 Ground rules, always:
 

@@ -51,6 +51,24 @@ public class SnHttp {
     public ObjectMapper json() { return json; }
     public HttpApi props() { return props; }
 
+    /** How this interface authenticates, without the secret: for probe / status. */
+    public String authDescription() {
+        ServiceNowProperties.Auth a = props.auth();
+        return switch (a.type()) {
+            case "bearer" -> "Bearer token from " + secretSource(a.token(), a.tokenEnv(), "SN_TOKEN");
+            case "basic" -> "Basic user=" + a.user() + ", password from " + secretSource(a.password(), a.passwordEnv(), "SN_PASSWORD");
+            case "none" -> "none";
+            default -> "UNKNOWN auth type '" + a.type() + "'";
+        };
+    }
+
+    private static String secretSource(String direct, String envName, String defaultEnv) {
+        if (direct != null && !direct.isBlank()) return "cr-agent.yml (plain text: move it to an environment variable)";
+        String env = envName == null || envName.isBlank() ? defaultEnv : envName;
+        String v = System.getenv(env);
+        return "env " + env + (v == null || v.isBlank() ? " (NOT SET)" : " (set)");
+    }
+
     /** GET {base-url}{path}; path may include a query string. */
     public JsonNode get(String path) { return exchange(HttpMethod.GET, path, null); }
 

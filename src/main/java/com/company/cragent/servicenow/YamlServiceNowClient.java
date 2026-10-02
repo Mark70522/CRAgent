@@ -24,10 +24,12 @@ public class YamlServiceNowClient implements ServiceNowClient {
 
     private final EndpointClient endpoints;
     private final ServiceNowProperties props;
+    private final FieldMap names;   // canonical <-> interface field names, from servicenow.field-map
 
     public YamlServiceNowClient(EndpointClient endpoints, ServiceNowProperties props) {
         this.endpoints = endpoints;
         this.props = props;
+        this.names = new FieldMap(props.fieldMap());
     }
 
     @Override
@@ -43,25 +45,28 @@ public class YamlServiceNowClient implements ServiceNowClient {
 
     @Override
     public ChangeRecord createChange(ChangeDraft draft) {
-        Map<String, Object> params = new LinkedHashMap<>(draft.fields());
-        params.put("fields", draft.fields());
-        params.put("tasks", draft.tasks());
+        Map<String, Object> fields = names.out(draft.fields());
+        List<Map<String, Object>> tasks = names.outList(draft.tasks());
+        Map<String, Object> params = new LinkedHashMap<>(fields);
+        params.put("fields", fields);
+        params.put("tasks", tasks);
         JsonNode rec = endpoints.call(CREATE, params);
-        return record(rec.path("number").asText(null), rec, CREATE);
+        return record(null, rec, CREATE);
     }
 
     @Override
     public ChangeRecord updateChange(String number, Map<String, Object> fields) {
-        Map<String, Object> params = new LinkedHashMap<>(fields == null ? Map.of() : fields);
+        Map<String, Object> f = names.out(fields == null ? Map.of() : fields);
+        Map<String, Object> params = new LinkedHashMap<>(f);
         params.put("number", number);
-        params.put("fields", fields == null ? Map.of() : fields);
+        params.put("fields", f);
         return record(number, endpoints.call(UPDATE, params), UPDATE);
     }
 
     private ChangeRecord record(String number, JsonNode rec, String endpoint) {
         ServiceNowProperties.Endpoint ep = props.endpoints().get(endpoint);
-        List<Map<String, String>> tasks = ep == null || ep.tasks() == null || ep.tasks().isBlank() ? List.of() : SnHttp.flattenList(SnHttp.path(rec, ep.tasks()));
-        Map<String, String> fields = SnHttp.flatten(rec);
+        List<Map<String, String>> tasks = ep == null || ep.tasks() == null || ep.tasks().isBlank() ? List.of() : names.inList(SnHttp.flattenList(SnHttp.path(rec, ep.tasks())));
+        Map<String, String> fields = names.in(SnHttp.flatten(rec));
         String n = number != null ? number : fields.getOrDefault("number", "");
         return new ChangeRecord(n, fields, tasks, rec);
     }
