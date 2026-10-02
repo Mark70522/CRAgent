@@ -34,10 +34,11 @@ public class StatusTools {
 
     private final IceClient ice;
     private final ConfigCheck check;
+    private final ToolRegistry registry;
 
-    public StatusTools(ServiceNowClient sn, IceClient ice, ConfigCheck check, Inventory inventory, RuleEngine rules, TemplateService templates, ExampleStore examples,
+    public StatusTools(ServiceNowClient sn, IceClient ice, ConfigCheck check, ToolRegistry registry, Inventory inventory, RuleEngine rules, TemplateService templates, ExampleStore examples,
                        Regression regression, KnowledgeProperties knowledge, CockpitProperties cockpit, AuditLog audit) {
-        this.sn = sn; this.ice = ice; this.check = check; this.inventory = inventory; this.rules = rules; this.templates = templates; this.examples = examples;
+        this.sn = sn; this.ice = ice; this.check = check; this.registry = registry; this.inventory = inventory; this.rules = rules; this.templates = templates; this.examples = examples;
         this.regression = regression; this.knowledge = knowledge; this.cockpit = cockpit; this.audit = audit;
     }
 
@@ -50,6 +51,7 @@ public class StatusTools {
         m.put("serviceNow", safe(sn::describe));
         m.put("ice", safe(ice::describe));
         m.put("configCheck", safe(check::summary));
+        m.put("tools", safe(registry::summary));
         m.put("inventory", safe(() -> inventory.entries().size() + " servers from " + inventory.source()));
         m.put("knowledgeDir", knowledge.knowledgeDir().toAbsolutePath().normalize().toString());
         m.put("hardRules", safe(() -> rules.loadRules().size()));

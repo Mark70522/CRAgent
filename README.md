@@ -138,6 +138,16 @@ yaml 模式的规则:
 |---|---|
 | `status` `check_config` `probe`(send=false)`draft_ice` `remember`(只写当天随手记,晚上还要确认)`get_change` `lookup_ci` `lookup_service` `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` `read_rules` `list_examples` `read_example` `eval_rules` `get_ice` `get_day` `list_tasks` `task_notes` `task_history` `search_knowledge` `read_knowledge` `cockpit_url` `open_cockpit` | `create_change` `update_change` `create_ice` `update_ice`(代码里还要 confirmed=true)· `probe`(send=true)`save_fixture` · `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` · `add_tasks` `update_task` `plan_day` `capture_note` `close_day` `save_knowledge` |
 
+**工具按需加载(省 token)**:Agent 模式每一轮都把全部工具定义发给模型,40 个工具约五六千 token。`cr-agent.yml` 里加
+
+```yaml
+tools:
+  mode: groups        # 默认 all
+  # core: [lookup_service]   # 想常驻的额外工具
+```
+
+启动只注册 8 个核心工具(`status`、`remember`、`search_knowledge`、`get_change`、`get_day`、`open_cockpit`、`use_tools`、`drop_tools`),Copilot 需要时自己调 `use_tools` 加载一组:`cr`、`learn`、`cockpit`、`integration`,用完 `drop_tools` 卸掉。依赖 Copilot 插件处理 MCP 的"工具清单变了"通知;试一轮不行就把 `mode` 改回 `all`。`status` 的 `tools` 一项显示当前模式和哪些组开着。
+
 **健康检查**:在 Copilot 里说 `status`,或命令行 `java scripts/CallTool.java status`,一次看到接口、清单、规则、范例、回归结果、页面地址、审计日志位置。
 
 ## 6. 到公司后的顺序(接口参数和返回还没定,就按这个来)
