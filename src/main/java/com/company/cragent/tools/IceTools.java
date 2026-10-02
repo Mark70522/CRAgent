@@ -1,6 +1,7 @@
 package com.company.cragent.tools;
 
 import com.company.cragent.cockpit.CockpitStore;
+import com.company.cragent.cockpit.RecordCache;
 import com.company.cragent.ice.IceClient;
 import com.company.cragent.ice.IceRecord;
 import org.slf4j.Logger;
@@ -12,7 +13,7 @@ import org.springframework.stereotype.Component;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** The two ICE operations as Copilot tools. Both write, both need the user's confirmation. */
+/** The three ICE operations as Copilot tools: read, create, update. Writes need the user's confirmation. Every result is cached locally. */
 @Component
 public class IceTools {
 
@@ -20,10 +21,22 @@ public class IceTools {
 
     private final IceClient ice;
     private final CockpitStore cockpit;
+    private final RecordCache cache;
 
-    public IceTools(IceClient ice, CockpitStore cockpit) {
+    public IceTools(IceClient ice, CockpitStore cockpit, RecordCache cache) {
         this.ice = ice;
         this.cockpit = cockpit;
+        this.cache = cache;
+    }
+
+    @Tool(name = "get_ice", description = """
+            Read one ICE record by id. Returns its fields and raw JSON, and stores a local copy under
+            cockpit/records/ice/ that the cockpit page shows. Pass changeNumber when you know which CR it belongs to.""")
+    public Map<String, Object> getIce(
+            @ToolParam(description = "ICE record id") String iceId,
+            @ToolParam(description = "The CR number this record belongs to, if known", required = false) String changeNumber) {
+        ready();
+        return cache.putIce(describe(ice.get(iceId.trim())), "get", changeNumber);
     }
 
     @Tool(name = "create_ice", description = """
@@ -40,7 +53,7 @@ public class IceTools {
         if (!confirmed) throw new IllegalStateException("Not sent: show the user the ICE fields and ask for confirmation, then call again with confirmed=true.");
         IceRecord rec = ice.create(changeNumber.trim(), fields == null ? Map.of() : fields);
         log.info("created ICE {} for {}", rec.id(), changeNumber);
-        Map<String, Object> out = describe(rec);
+        Map<String, Object> out = cache.putIce(describe(rec), "create", changeNumber.trim());
         if (taskId != null && !taskId.isBlank() && rec.id() != null && !rec.id().isBlank()) {
             try {
                 out.put("task", cockpit.updateTask(taskId.trim(), Map.of("ice", rec.id()), "ICE " + rec.id() + " 已创建(" + changeNumber + ")"));
@@ -62,7 +75,7 @@ public class IceTools {
         if (!confirmed) throw new IllegalStateException("Not updated: show the user exactly what will change in ICE and ask for confirmation, then call again with confirmed=true.");
         IceRecord rec = ice.update(iceId.trim(), fields == null ? Map.of() : fields);
         log.info("updated ICE {}", iceId);
-        return describe(rec);
+        return cache.putIce(describe(rec), "update", null);
     }
 
     private void ready() {

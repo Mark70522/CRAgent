@@ -6,7 +6,9 @@ The MCP server `cr-agent` exposes the tools; the skills under `.github/skills/` 
 
 ServiceNow is reached only through three operations the user wired up in `cr-agent.yml` or
 `CompanyServiceNowClient`: `get_change`, `create_change`, `update_change`. ICE, the second system every
-CR is registered in, has two: `create_ice`, `update_ice` (ice: section or `CompanyIceClient`).
+CR is registered in, has three: `get_ice`, `create_ice`, `update_ice` (ice: section or `CompanyIceClient`).
+Every record these return is kept under `cockpit/records/` and shown on the cockpit page; when the user
+asks to "see" a CR or ICE record, `open_cockpit` view change after reading it.
 `status` shows what is configured. Field names are whatever each interface expects; never rename them.
 
 Ground rules, always:

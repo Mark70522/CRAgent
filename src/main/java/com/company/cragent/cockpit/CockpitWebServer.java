@@ -3,6 +3,7 @@ package com.company.cragent.cockpit;
 import com.company.cragent.cockpit.CockpitModel.*;
 import com.company.cragent.config.CockpitProperties;
 import com.company.cragent.audit.AuditLog;
+import com.company.cragent.tools.IceTools;
 import com.company.cragent.tools.ServiceNowTools;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -41,14 +42,18 @@ public class CockpitWebServer {
     private final CockpitProperties props;
     private final ObjectMapper json;
     private final ServiceNowTools sn;
+    private final IceTools ice;
+    private final RecordCache cache;
     private final AuditLog audit;
     private HttpServer server;
 
-    public CockpitWebServer(CockpitStore store, CockpitProperties props, ObjectMapper json, ServiceNowTools sn, AuditLog audit) {
+    public CockpitWebServer(CockpitStore store, CockpitProperties props, ObjectMapper json, ServiceNowTools sn, IceTools ice, RecordCache cache, AuditLog audit) {
         this.store = store;
         this.props = props;
         this.json = json;
         this.sn = sn;
+        this.ice = ice;
+        this.cache = cache;
         this.audit = audit;
     }
 
@@ -83,13 +88,21 @@ public class CockpitWebServer {
                 return Map.of("file", f.getFileName().toString());
             }));
             server.createContext("/api/close", ex -> post(ex, b -> store.closeDay(null, b.path("summary").asText(""), null)));
-            // Change request viewer: the record as ServiceNow returns it, plus the hard-rule check and similar history.
-            server.createContext("/api/change", ex -> {
-                String number = query(ex).getOrDefault("number", "").trim();
-                if (number.isEmpty()) { respondJson(ex, Map.of("error", "number is required")); return; }
+            // Records viewer. Cached copies of every CR / ICE record the tools touched; "live" fetches through the
+            // interface and refreshes the copy. The page never needs the interface just to look at something.
+            server.createContext("/api/records", ex -> respondJson(ex, cache.list()));
+            server.createContext("/api/record", ex -> {
+                Map<String, String> q = query(ex);
+                String kind = q.getOrDefault("kind", "change").trim(), id = q.getOrDefault("id", "").trim();
+                boolean live = "1".equals(q.get("live"));
+                if (id.isEmpty()) { respondJson(ex, Map.of("error", "id is required")); return; }
                 try {
-                    Map<String, Object> m = new LinkedHashMap<>(sn.getChange(number));
-                    m.put("number", number);
+                    Map<String, Object> m;
+                    if (live) m = new LinkedHashMap<>("ice".equals(kind) ? ice.getIce(id, null) : sn.getChange(id));
+                    else m = new LinkedHashMap<>(cache.get(kind, id).orElseThrow(() -> new IllegalStateException("not cached: " + kind + " " + id + " (use live=1 or read it in Copilot first)")));
+                    m.put("kind", kind);
+                    m.put("id", id);
+                    linked(m, kind, id);
                     respondJson(ex, m);
                 } catch (Exception e) {
                     respondJson(ex, Map.of("error", String.valueOf(e.getMessage())));
@@ -106,6 +119,20 @@ public class CockpitWebServer {
 
     @PreDestroy
     void stop() { if (server != null) server.stop(0); }
+
+    /** Adds what else we know about a record: the cockpit task that owns it, and its counterpart (CR <-> ICE). */
+    private void linked(Map<String, Object> m, String kind, String id) {
+        Task task = store.tasks().stream().filter(t -> "ice".equals(kind) ? id.equalsIgnoreCase(t.ice) : id.equalsIgnoreCase(t.cr)).findFirst().orElse(null);
+        if (task != null) m.put("task", task);
+        if ("change".equals(kind)) {
+            String iceId = task != null && task.ice != null ? task.ice
+                    : cache.list().stream().filter(r -> "ice".equals(r.get("kind")) && id.equalsIgnoreCase(String.valueOf(r.get("changeNumber")))).map(r -> String.valueOf(r.get("id"))).findFirst().orElse(null);
+            if (iceId != null) m.put("iceId", iceId);
+        } else {
+            Object cn = m.get("changeNumber");
+            if (cn == null && task != null && task.cr != null) m.put("changeNumber", task.cr);
+        }
+    }
 
     /** Everything the page needs in one call. */
     Map<String, Object> state() {

@@ -2,6 +2,7 @@ package com.company.cragent.tools;
 
 import com.company.cragent.cockpit.CockpitModel.Task;
 import com.company.cragent.cockpit.CockpitStore;
+import com.company.cragent.cockpit.RecordCache;
 import com.company.cragent.config.CockpitProperties;
 import com.company.cragent.model.ChangeDraft;
 import com.company.cragent.model.ChangeRecord;
@@ -57,12 +58,37 @@ class ServiceNowToolsTest {
     @TempDir Path tmp;
     final RecordingClient client = new RecordingClient();
     CockpitStore cockpit;
+    RecordCache cache;
     ServiceNowTools tools;
 
     @BeforeEach
     void setUp() {
-        cockpit = new CockpitStore(new CockpitProperties(tmp, 0, false), new ObjectMapper());
-        tools = new ServiceNowTools(client, new RuleEngine(Path.of("knowledge/rules/hard-rules.yaml")), cockpit);
+        CockpitProperties props = new CockpitProperties(tmp, 0, false);
+        cockpit = new CockpitStore(props, new ObjectMapper());
+        cache = new RecordCache(props, new ObjectMapper());
+        tools = new ServiceNowTools(client, new RuleEngine(Path.of("knowledge/rules/hard-rules.yaml")), cockpit, cache);
+    }
+
+    @Test
+    void everyOperationLeavesALocalCopy() {
+        assertThat(cache.list()).isEmpty();
+        tools.createChange(goodDraft(), true, null);
+        assertThat(cache.get("change", "CHG0099")).isPresent();
+        assertThat(cache.get("change", "CHG0099").get().get("action")).isEqualTo("create");
+        assertThat(cache.get("change", "CHG0099").get().get("title")).isEqualTo("[PATCH] srv-app-01 - 2026-10 Windows monthly security patches");
+        assertThat(cache.list()).hasSize(1);
+        assertThat(cache.list().get(0).get("passed")).isEqualTo(true);   // the created draft passed the rules
+
+        tools.updateChange("CHG0099", Map.of("risk", "High"), true);
+        Map<String, Object> rec = cache.get("change", "CHG0099").orElseThrow();
+        assertThat(rec.get("action")).isEqualTo("update");
+        @SuppressWarnings("unchecked") Map<String, Object> f = (Map<String, Object>) rec.get("fields");
+        assertThat(f).containsEntry("risk", "High");
+
+        tools.getChange("CHG0099");   // the in-test client returns no tasks on read, so the rule result changes, but it is still one file
+        assertThat(cache.list()).hasSize(1);
+        assertThat(cache.list().get(0).get("id")).isEqualTo("CHG0099");
+        assertThat(cache.get("change", "CHG0099").orElseThrow().get("action")).isEqualTo("get");
     }
 
     static ChangeDraft goodDraft() {

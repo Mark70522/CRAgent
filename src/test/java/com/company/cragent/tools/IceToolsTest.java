@@ -2,6 +2,7 @@ package com.company.cragent.tools;
 
 import com.company.cragent.cockpit.CockpitModel.Task;
 import com.company.cragent.cockpit.CockpitStore;
+import com.company.cragent.cockpit.RecordCache;
 import com.company.cragent.config.CockpitProperties;
 import com.company.cragent.config.IceProperties;
 import com.company.cragent.config.ServiceNowProperties;
@@ -33,6 +34,7 @@ class IceToolsTest {
     static class RecordingIce implements IceClient {
         final List<String> calls = new ArrayList<>();
         boolean configured = true;
+        public IceRecord get(String iceId) { calls.add("get " + iceId); return new IceRecord(iceId, Map.of("id", iceId, "title", "patch"), null); }
         public IceRecord create(String changeNumber, Map<String, Object> fields) { calls.add("create " + changeNumber + " " + fields); return new IceRecord("ICE-77", Map.of("id", "ICE-77"), null); }
         public IceRecord update(String iceId, Map<String, Object> fields) { calls.add("update " + iceId + " " + fields); return new IceRecord(iceId, Map.of("id", iceId), null); }
         public String describe() { return "recording"; }
@@ -42,12 +44,30 @@ class IceToolsTest {
     @TempDir Path tmp;
     RecordingIce ice = new RecordingIce();
     CockpitStore cockpit;
+    RecordCache cache;
     IceTools tools;
 
     @BeforeEach
     void setUp() {
-        cockpit = new CockpitStore(new CockpitProperties(tmp, 0, false), new ObjectMapper());
-        tools = new IceTools(ice, cockpit);
+        CockpitProperties props = new CockpitProperties(tmp, 0, false);
+        cockpit = new CockpitStore(props, new ObjectMapper());
+        cache = new RecordCache(props, new ObjectMapper());
+        tools = new IceTools(ice, cockpit, cache);
+    }
+
+    @Test
+    void readsAreCachedWithTheirChangeNumber() {
+        Map<String, Object> out = tools.getIce("ICE-5", "CHG0001");
+        assertThat(out.get("id")).isEqualTo("ICE-5");
+        assertThat(out.get("changeNumber")).isEqualTo("CHG0001");
+        assertThat(cache.get("ice", "ICE-5")).isPresent();
+        assertThat(cache.list().get(0).get("changeNumber")).isEqualTo("CHG0001");
+        assertThat(cache.list().get(0).get("title")).isEqualTo("patch");
+
+        // a later read without the number keeps the one we knew
+        tools.getIce("ICE-5", null);
+        assertThat(cache.get("ice", "ICE-5").orElseThrow().get("changeNumber")).isEqualTo("CHG0001");
+        assertThat(ice.calls).containsExactly("get ICE-5", "get ICE-5");
     }
 
     @Test
@@ -103,12 +123,16 @@ class IceToolsTest {
                 "http://127.0.0.1:" + server.getAddress().getPort(),
                 new ServiceNowProperties.Auth("basic", null, null, "svc", null, "pw"),
                 null, null, null, null, null, "iceId",
-                Map.of("create-ice", new ServiceNowProperties.Endpoint("POST", "/ice", null, null, "{\"cr\": ${number}, \"data\": ${fields}}", "data", null, null),
+                Map.of("get-ice", new ServiceNowProperties.Endpoint("GET", "/ice/${id}", null, null, null, "data", null, null),
+                       "create-ice", new ServiceNowProperties.Endpoint("POST", "/ice", null, null, "{\"cr\": ${number}, \"data\": ${fields}}", "data", null, null),
                        "update-ice", new ServiceNowProperties.Endpoint("PUT", "/ice/${id}", null, null, null, "data", null, null)));
         ObjectMapper json = new ObjectMapper();
         YamlIceClient client = new YamlIceClient(new IceEndpoints(props, new IceHttp(props, json), json), props);
 
         assertThat(client.configured()).isTrue();
+        assertThat(client.get("ICE-9").id()).isEqualTo("ICE-9");
+        assertThat(seen.get(0)).startsWith("GET /ice/ICE-9 ");
+        seen.clear();
         IceRecord created = client.create("CHG0001", Map.of("title", "patch"));
         assertThat(created.id()).isEqualTo("ICE-9");
         IceRecord updated = client.update("ICE-9", Map.of("state", "closed"));

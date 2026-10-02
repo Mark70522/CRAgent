@@ -1,6 +1,7 @@
 package com.company.cragent.tools;
 
 import com.company.cragent.cockpit.CockpitStore;
+import com.company.cragent.cockpit.RecordCache;
 import com.company.cragent.model.ChangeDraft;
 import com.company.cragent.model.ChangeRecord;
 import com.company.cragent.model.Violation;
@@ -25,18 +26,21 @@ public class ServiceNowTools {
     private final ServiceNowClient sn;
     private final RuleEngine rules;
     private final CockpitStore cockpit;
+    private final RecordCache cache;
 
-    public ServiceNowTools(ServiceNowClient sn, RuleEngine rules, CockpitStore cockpit) {
+    public ServiceNowTools(ServiceNowClient sn, RuleEngine rules, CockpitStore cockpit, RecordCache cache) {
         this.sn = sn;
         this.rules = rules;
         this.cockpit = cockpit;
+        this.cache = cache;
     }
 
     @Tool(name = "get_change", description = """
             Read one change request by number. Returns its fields, its tasks, the hard-rule check result and,
-            when a cockpit task is linked to this number, that task under `task`.""")
+            when a cockpit task is linked to this number, that task under `task`. A local copy is kept under
+            cockpit/records/change/ and shown on the cockpit page.""")
     public Map<String, Object> getChange(@ToolParam(description = "Change number like CHG0012345") String number) {
-        Map<String, Object> out = describe(sn.getChange(number.trim()));
+        Map<String, Object> out = cache.putChange(describe(sn.getChange(number.trim())), "get");
         cockpit.tasks().stream().filter(t -> number.trim().equalsIgnoreCase(t.cr)).findFirst().ifPresent(t -> out.put("task", t));
         return out;
     }
@@ -57,7 +61,7 @@ public class ServiceNowTools {
         if (!errors.isEmpty()) throw new IllegalStateException("Not created: " + errors.size() + " hard-rule error(s) remain: " + errors);
         ChangeRecord rec = sn.createChange(draft);
         log.info("created change {}", rec.number());
-        Map<String, Object> out = describe(rec);
+        Map<String, Object> out = cache.putChange(describe(rec), "create");
         if (taskId != null && !taskId.isBlank() && rec.number() != null && !rec.number().isBlank()) {
             try {
                 out.put("task", cockpit.linkChange(taskId.trim(), rec.number()));
@@ -78,7 +82,7 @@ public class ServiceNowTools {
         if (!confirmed) throw new IllegalStateException("Not updated: show the user exactly what will change and ask for confirmation, then call again with confirmed=true.");
         ChangeRecord rec = sn.updateChange(number.trim(), fields == null ? Map.of() : fields);
         log.info("updated change {}", number);
-        return describe(rec);
+        return cache.putChange(describe(rec), "update");
     }
 
     /** Record -> number, fields, tasks, violations, passed, raw. Shared with the web viewer. */

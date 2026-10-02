@@ -17,7 +17,7 @@ import java.util.Map;
 @ConditionalOnProperty(name = "ice.client", havingValue = "yaml", matchIfMissing = true)
 public class YamlIceClient implements IceClient {
 
-    public static final String CREATE = "create-ice", UPDATE = "update-ice";
+    public static final String GET = "get-ice", CREATE = "create-ice", UPDATE = "update-ice";
 
     private final IceEndpoints endpoints;
     private final IceProperties props;
@@ -33,6 +33,11 @@ public class YamlIceClient implements IceClient {
     public String describe() {
         if (!configured()) return "ICE: not configured (no ice: section in cr-agent.yml)";
         return "ICE yaml client -> " + props.baseUrl() + " " + endpoints.endpoints();
+    }
+
+    @Override
+    public IceRecord get(String iceId) {
+        return record(iceId, endpoints.call(GET, Map.of("id", iceId)));
     }
 
     @Override

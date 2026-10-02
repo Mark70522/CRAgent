@@ -56,7 +56,7 @@ servicenow:
 
 只有这三个接口:读、建、改。对应三个工具 `get_change`、`create_change`、`update_change`;建和改都要你确认才发。
 
-**ICE 接口**:CR 还要在 ICE 里登记一份,预留两个接口:建、改。写法和上面一样,放在 `ice:` 段(可以是另一个地址、另一套认证,密码用 `ICE_PASSWORD` 之类的环境变量):
+**ICE 接口**:CR 还要在 ICE 里登记一份,预留三个接口:读、建、改。写法和上面一样,放在 `ice:` 段(可以是另一个地址、另一套认证,密码用 `ICE_PASSWORD` 之类的环境变量):
 
 ```yaml
 ice:
@@ -64,11 +64,14 @@ ice:
   auth: { type: basic, user: svc_cr, password-env: ICE_PASSWORD }
   id-field: id                                   # 返回里哪个键是 ICE 记录号
   endpoints:
+    get-ice:    { method: GET,  path: /ice/${id}, result: data }   # 参数:id
     create-ice: { method: POST, path: /ice,       result: data }   # 参数:number(CR 号)、fields、每个字段
     update-ice: { method: PUT,  path: /ice/${id}, result: data }   # 参数:id、fields、每个字段
 ```
 
-对应工具 `create_ice`、`update_ice`,同样要确认。create-cr 建完 CR 会接着提议登 ICE,ICE 号挂在任务上和 CHG 号并排显示。不配 `ice:` 段就是关着的,`status` 会说明,工具会拒绝。要自己写 Java 就 `ice.client: company`,填 `CompanyIceClient.java` 的两个 TODO。
+对应工具 `get_ice`、`create_ice`、`update_ice`,建和改要确认。create-cr 建完 CR 会接着提议登 ICE,ICE 号挂在任务上和 CHG 号并排显示。不配 `ice:` 段就是关着的,`status` 会说明,工具会拒绝。要自己写 Java 就 `ice.client: company`,填 `CompanyIceClient.java` 的三个 TODO。
+
+**本地留存**:CR 和 ICE 每张被读过、建过、改过的单都在 `cockpit/records/{change,ice}/<单号>.json` 留一份(字段、task、硬规则结果、接口原始返回、什么时候读的)。页面「变更单」视图左边列出所有留存的单,点开看全文,CR 和它的 ICE、所属任务互相有链接;只有点「从接口刷新」或输单号读取才会去碰接口。
 
 接口怎么实现,二选一(`servicenow.client`):
 
@@ -131,7 +134,7 @@ yaml 模式的规则:
 
 | 只读,可以自动批准 | 会写东西,保留确认 |
 |---|---|
-| `status` `get_change` `lookup_ci` `lookup_service` `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` `read_rules` `list_examples` `read_example` `eval_rules` `get_day` `list_tasks` `task_notes` `task_history` `search_knowledge` `read_knowledge` `cockpit_url` `open_cockpit` | `create_change` `update_change` `create_ice` `update_ice`(代码里还要 confirmed=true)· `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` · `add_tasks` `update_task` `plan_day` `capture_note` `close_day` `save_knowledge` |
+| `status` `get_change` `lookup_ci` `lookup_service` `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` `read_rules` `list_examples` `read_example` `eval_rules` `get_ice` `get_day` `list_tasks` `task_notes` `task_history` `search_knowledge` `read_knowledge` `cockpit_url` `open_cockpit` | `create_change` `update_change` `create_ice` `update_ice`(代码里还要 confirmed=true)· `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` · `add_tasks` `update_task` `plan_day` `capture_note` `close_day` `save_knowledge` |
 
 **健康检查**:在 Copilot 里说 `status`,或命令行 `java scripts/CallTool.java status`,一次看到接口、清单、规则、范例、回归结果、页面地址、审计日志位置。
 

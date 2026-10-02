@@ -52,6 +52,10 @@ servicenow:
 #     password-env: ICE_PASSWORD
 #   id-field: id                 # 返回记录里哪个键是 ICE 记录号
 #   endpoints:
+#     get-ice:                   # 参数: id(ICE 记录号)
+#       method: GET
+#       path: /ice/${id}
+#       result: data
 #     create-ice:                # 参数: number(CR 号), fields(字段对象), 以及每个字段单独的 ${字段名}
 #       method: POST
 #       path: /ice

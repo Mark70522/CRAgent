@@ -157,6 +157,13 @@ h1,h2,h3{margin:0}
 .hmeta{font-size:12px;color:var(--ink-3);display:flex;gap:10px;flex-wrap:wrap;margin-top:2px}
 .hst{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500}
 .hst.done{background:var(--good-soft);color:var(--good)} .hst.todo,.hst.doing{background:var(--warn-soft);color:var(--warn)} .hst.dropped{background:var(--surface-2);color:var(--ink-3)} .hst.waiting{background:var(--accent-soft);color:var(--accent)}
+.reclist{display:flex;flex-direction:column;gap:6px;max-height:70vh;overflow:auto}
+.rec{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;text-align:left;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer}
+.rec:hover{background:var(--surface-2)} .rec.on{border-color:var(--accent);background:var(--accent-soft)}
+.rk{display:inline-block;padding:2px 6px;border-radius:6px;font-size:10px;font-weight:600;letter-spacing:.04em;background:var(--surface-2);color:var(--ink-2);margin-top:2px} .rk.ice{background:var(--accent-soft);color:var(--accent)}
+.rid{font-size:13px;font-weight:500} .rt{font-size:12px;color:var(--ink-2);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .rm{font-size:11px;color:var(--ink-3);margin-top:2px}
+.rbad{font-style:normal;color:var(--bad);font-size:11px;font-weight:500}
+.cbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:12px;padding:8px 10px;border-radius:8px;background:var(--surface-2);font-size:12.5px;color:var(--ink-2)} .cbar .sp{flex:1} .cbar a{color:var(--accent);text-decoration:none} .cbar .btn{padding:4px 10px;font-size:12px}
 .watch{display:flex;flex-direction:column;gap:8px} .watch .w{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:baseline;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)} .watch .w .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap} .watch .w .n{font-family:var(--mono);font-size:12px;color:var(--ink-3)} .watch .w.hot{border-color:var(--warn);background:var(--warn-soft)}
 .hbody{display:none;padding:4px 14px 14px;border-top:1px dashed var(--line);font-size:13px}
 .hrow.open .hbody{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px 22px}
@@ -298,9 +305,20 @@ table.cr-t td.num{white-space:nowrap}
     </section>
 
     <section class="view" id="v-change" hidden>
-      <form class="cap" id="crform"><input id="crnum" placeholder="输入变更单号,如 CHG0012345" aria-label="变更单号" autocomplete="off"><button class="btn" type="submit">读取</button></form>
-      <div class="hint">通过 cr-agent.yml 里的 get-change 接口直接读,同时跑一遍硬规则。</div>
-      <div id="crout"></div>
+      <form class="cap" id="crform">
+        <input id="crnum" placeholder="单号:CHG0012345 或 ICE 记录号" aria-label="单号" autocomplete="off">
+        <button class="btn" type="submit" data-kind="change">读 CR</button>
+        <button class="btn ghost" type="button" id="icebtn" data-kind="ice">读 ICE</button>
+      </form>
+      <div class="hint">Copilot 读过、建过、改过的每一张单都在本地留了一份(cockpit/records/),这里直接看,不用再碰接口;「刷新」才会去接口取最新的。</div>
+      <div class="grid2" style="grid-template-columns:minmax(240px,320px) minmax(0,1fr)">
+        <div class="card">
+          <div class="card-h"><h2>本地留存的单</h2><span class="meta" id="rec-meta"></span></div>
+          <input class="ksearch" id="recq" placeholder="筛:单号、标题、状态" aria-label="筛选" style="margin-bottom:10px">
+          <div class="reclist" id="reclist"></div>
+        </div>
+        <div id="crout"><div class="empty">左边点一张单,或者在上面输单号读取。</div></div>
+      </div>
     </section>
 
     <section class="view" id="v-knowledge" hidden>
@@ -468,7 +486,7 @@ table.cr-t td.num{white-space:nowrap}
     document.querySelectorAll('.nav button').forEach(function(b){ if (b.dataset.view===v) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
     document.getElementById('vtitle').textContent = titles[v];
     if (v==='history') loadHistory();
-    if (v==='change') { var n = document.getElementById('crnum').value.trim(); if (n && !document.getElementById('crout').innerHTML) loadChange(n); }
+    if (v==='change') { loadRecords(); if (REC.id && !document.querySelector('#crout .card')) loadRecord(REC.kind, REC.id, false); }
     try { localStorage.setItem('cockpit-view', v); } catch(e){}
   }
 
@@ -540,11 +558,55 @@ table.cr-t td.num{white-space:nowrap}
   // ── change request viewer ──
   var LONG = [['description','描述'],['justification','变更理由'],['implementation_plan','实施计划'],['risk_impact_analysis','风险与影响分析'],['backout_plan','回退方案'],['test_plan','测试计划']];
   var BASIC = [['type','类型'],['category','分类'],['risk','风险'],['impact','影响'],['priority','优先级'],['state','状态'],['approval','审批'],['cmdb_ci','配置项'],['assignment_group','负责组'],['assigned_to','负责人'],['requested_by','申请人'],['start_date','计划开始'],['end_date','计划结束'],['close_code','关闭代码'],['sys_updated_on','最近更新']];
-  function loadChange(num){
+  var REC = { kind:'change', id:'' };
+  function loadRecords(){
+    api('/api/records').then(function(rows){
+      var q = (document.getElementById('recq').value||'').trim().toLowerCase();
+      var list = rows.filter(function(r){ return !q || [r.id, r.title, r.state, r.kind, r.changeNumber].join(' ').toLowerCase().indexOf(q) >= 0; });
+      document.getElementById('rec-meta').textContent = rows.length ? rows.length+' 张' : '';
+      document.getElementById('reclist').innerHTML = list.length ? list.map(function(r){
+        var on = r.kind===REC.kind && r.id===REC.id;
+        return '<button type="button" class="rec'+(on?' on':'')+'" data-kind="'+esc(r.kind)+'" data-id="'+esc(r.id)+'">'
+          + '<span class="rk '+esc(r.kind)+'">'+(r.kind==='ice'?'ICE':'CR')+'</span>'
+          + '<span><div class="rid num">'+esc(r.id)+(r.passed===false?' <i class="rbad">不合规</i>':'')+'</div><div class="rt">'+esc(r.title||'')+'</div>'
+          + '<div class="rm">'+(r.state?esc(r.state)+' · ':'')+(r.changeNumber?esc(r.changeNumber)+' · ':'')+esc((r.fetchedAt||'').slice(5,16))+'</div></span></button>';
+      }).join('') : '<div class="empty">'+(rows.length?'没有匹配的':'还没有。在 Copilot 里说"看一下 CHG…",读过的单就会留在这里。')+'</div>';
+      document.querySelectorAll('.rec').forEach(function(b){ b.onclick = function(){ loadRecord(b.dataset.kind, b.dataset.id, false); }; });
+    });
+  }
+  function loadRecord(kind, id, live){
+    REC = { kind:kind, id:id };
     var out = document.getElementById('crout');
-    out.innerHTML = '<div class="empty">读取中 …</div>';
-    api('/api/change?number='+encodeURIComponent(num)).then(function(r){
-      if (r.error) { out.innerHTML = '<div class="empty">'+esc(r.error)+'</div>'; return; }
+    out.innerHTML = '<div class="empty">'+(live?'从接口读取中 …':'读取中 …')+'</div>';
+    api('/api/record?kind='+encodeURIComponent(kind)+'&id='+encodeURIComponent(id)+(live?'&live=1':'')).then(function(r){
+      if (r.error) { out.innerHTML = '<div class="empty">'+esc(r.error)+(live?'':'<br><button class="btn" style="margin-top:10px" onclick="document.getElementById(\'crnum\').value=\''+esc(id)+'\'">去接口读</button>')+'</div>'; return; }
+      try { localStorage.setItem('cockpit-rec', kind+':'+id); } catch(e){}
+      if (kind === 'ice') renderIce(r); else renderChange(r);
+      loadRecords();
+    });
+  }
+  function cacheBar(r){
+    return '<div class="cbar"><span>'+(r.action==='create'?'建于':r.action==='update'?'改于':'读于')+' <span class="num">'+esc(r.fetchedAt||'')+'</span>'+(r.firstSeen && r.firstSeen!==r.fetchedAt?' · 首次 <span class="num">'+esc(r.firstSeen)+'</span>':'')+' · 本地副本</span>'
+      + (r.task ? '<span>任务 <a href="#history" class="num" data-task="'+esc(r.task.id)+'">'+esc(r.task.id)+'</a> '+esc(r.task.title)+'</span>' : '')
+      + (r.kind==='change' ? (r.iceId ? '<span>ICE <a href="#change" class="num" data-rec="ice:'+esc(r.iceId)+'">'+esc(r.iceId)+'</a></span>' : '<span class="rbad">未登 ICE</span>') : (r.changeNumber ? '<span>CR <a href="#change" class="num" data-rec="change:'+esc(r.changeNumber)+'">'+esc(r.changeNumber)+'</a></span>' : ''))
+      + '<span class="sp"></span><button type="button" class="btn ghost" id="recfresh">从接口刷新</button></div>';
+  }
+  function afterRender(r){
+    var b = document.getElementById('recfresh'); if (b) b.onclick = function(){ loadRecord(r.kind, r.id, true); };
+    document.querySelectorAll('[data-rec]').forEach(function(a){ a.onclick = function(e){ e.preventDefault(); var p = a.dataset.rec.split(':'); loadRecord(p[0], p.slice(1).join(':'), false); }; });
+    document.querySelectorAll('[data-task]').forEach(function(a){ a.onclick = function(e){ e.preventDefault(); document.getElementById('hq').value = a.dataset.task; show('history'); loadHistory(); }; });
+  }
+  function renderIce(r){
+    var out = document.getElementById('crout'), f = r.fields || {};
+    var grid = Object.keys(f).filter(function(k){ return f[k] !== '' && f[k] != null; }).map(function(k){ var v = String(f[k]); return '<div class="cr-f"><div class="k">'+esc(k)+'</div><div class="v'+(/date|time|_on$|_at$/i.test(k)?' num':'')+'">'+esc(v.length>160?v.slice(0,160)+'…':v)+'</div></div>'; }).join('') || '<div class="empty">接口没返回字段</div>';
+    out.innerHTML = '<div class="card"><div class="cr-head"><div><div class="cr-num">ICE '+esc(r.id)+'</div><div class="cr-title">'+esc(r.title||'')+'</div></div></div>'+cacheBar(r)
+      + '<div class="cr-grid" style="margin-top:16px">'+grid+'</div></div>'
+      + '<div class="card"><div class="cr-sec"><h3>接口原始返回</h3><pre style="font-family:var(--mono);font-size:12px">'+esc(JSON.stringify(r.raw, null, 2))+'</pre></div></div>';
+    afterRender(r);
+  }
+  function renderChange(r){
+    var out = document.getElementById('crout');
+    {
       var f = r.fields || {}, tasks = r.tasks || [], vios = r.violations || [];
       var longKeys = LONG.map(function(p){ return p[0]; });
       var chips = '<span class="pill '+(r.passed?'good':'bad')+'"><span class="dot"></span>硬规则 '+(r.passed?'通过':vios.filter(function(v){return v.severity==='error';}).length+' 处不合规')+'</span>'
@@ -560,7 +622,7 @@ table.cr-t td.num{white-space:nowrap}
       var vio = vios.length ? '<div class="vio">'+vios.map(function(v){ return '<div class="vio-row"><span class="id">'+esc(v.ruleId)+'</span><span class="sev '+esc(v.severity)+'">'+esc(v.severity)+'</span><span>'+esc(v.message)+(v.suggestion?'<span class="sug">建议:'+esc(v.suggestion)+'</span>':'')+'</span></div>'; }).join('')+'</div>' : '<div class="empty">全部硬规则通过</div>';
       var raw = '<div class="cr-sec"><h3>接口原始返回</h3><pre style="font-family:var(--mono);font-size:12px">'+esc(JSON.stringify(r.raw, null, 2))+'</pre></div>';
       out.innerHTML =
-        '<div class="card"><div class="cr-head"><div><div class="cr-num">'+esc(f.number||r.number)+'</div><div class="cr-title">'+esc(f.short_description||'')+'</div></div><div class="cr-chips">'+chips+'</div></div>'
+        '<div class="card"><div class="cr-head"><div><div class="cr-num">'+esc(f.number||r.number||r.id)+'</div><div class="cr-title">'+esc(f.short_description||'')+'</div></div><div class="cr-chips">'+chips+'</div></div>'+cacheBar(r)
         + '<div class="cr-grid" style="margin-top:16px">'+basic+'</div></div>'
         + '<div class="grid2" style="grid-template-columns:minmax(0,1.4fr) minmax(280px,1fr)">'
         +   '<div class="card">'+longs+'</div>'
@@ -568,11 +630,14 @@ table.cr-t td.num{white-space:nowrap}
         + '</div>'
         + '<div class="card"><div class="card-h"><h2>Tasks</h2><span class="meta">'+tasks.length+' 个</span></div>'+tbl+'</div>'
         + '<div class="card">'+raw+'</div>';
-      try { localStorage.setItem('cockpit-cr', num); } catch(e){}
-    });
+    }
+    afterRender(r);
   }
-  document.getElementById('crform').addEventListener('submit', function(e){ e.preventDefault(); var n = document.getElementById('crnum').value.trim(); if (n) loadChange(n); });
-  try { var lastCr = localStorage.getItem('cockpit-cr'); if (lastCr) { document.getElementById('crnum').value = lastCr; } } catch(e){}
+  function readFromForm(kind){ var n = document.getElementById('crnum').value.trim(); if (n) loadRecord(kind, n, true); }
+  document.getElementById('crform').addEventListener('submit', function(e){ e.preventDefault(); readFromForm('change'); });
+  document.getElementById('icebtn').addEventListener('click', function(){ readFromForm('ice'); });
+  var recT; document.getElementById('recq').addEventListener('input', function(){ clearTimeout(recT); recT = setTimeout(loadRecords, 200); });
+  try { var lastRec = localStorage.getItem('cockpit-rec'); if (lastRec) { var p = lastRec.split(':'); REC = { kind:p[0], id:p.slice(1).join(':') }; } } catch(e){}
 
   var histT;
   document.getElementById('hq').addEventListener('input', function(){ clearTimeout(histT); histT = setTimeout(loadHistory, 250); });
