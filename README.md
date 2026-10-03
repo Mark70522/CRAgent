@@ -71,7 +71,11 @@ ice:
 
 对应工具 `get_ice`、`create_ice`、`update_ice`,建和改要确认。create-cr 建完 CR 会接着提议登 ICE,ICE 号挂在任务上和 CHG 号并排显示。不配 `ice:` 段就是关着的,`status` 会说明,工具会拒绝。要自己写 Java 就 `ice.client: company`,填 `CompanyIceClient.java` 的三个 TODO。
 
-**页面上的三个视图**(左栏「变更」):
+**React 管理界面**:http://127.0.0.1:7777/app/ 。变更单列表 / 详情(读、编辑保存、task 建 / 取消 / 关闭、ICE 关联)/ 新建(模板起草、校验、创建),ICE 列表 / 详情(查分数、历史)/ 登记,本地台账,字段目录。源码在 `web/`,构建产物已提交到 `src/main/resources/static/app`,公司机器只需要 Maven。改前端:在家 `cd web && npm install && npm run dev`(代理到 7777),改完 `npm run build` 再 `mvn package` 提交。REST 在 `/api/v1`,返回体 `{code, message, data}`。
+
+**字段不写死**:表单按 `knowledge/forms/{change,task,ice}.json` 渲染(key、标签、类型、分组、必填、只读、选项),接口多返回的键在详情页"收进目录";页面「字段目录」可直接改。代码里只认几个标准键,其余字段原样透传。
+
+**驾驶舱旧页面上的三个视图**(左栏「变更」):
 
 | 视图 | 能做什么 | 走哪个接口 |
 |---|---|---|
