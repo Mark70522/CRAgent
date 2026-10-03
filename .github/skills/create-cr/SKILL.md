@@ -23,7 +23,9 @@ as the default start time; if the task has a `cr` already, say so and stop - rev
    user confirm scope. A server missing from the inventory → stop and ask; never guess.
    The result includes each server's maintenance window; the usual one is Sunday 00:00-06:00. If the
    requested time is outside it, say so once and ask the user to confirm (HR-018 only warns).
-3. `list_templates` → pick by keywords; none fits → say so and offer the closest.
+3. `list_templates` → pick by keywords and by the service name (templates made from history carry the
+   service in their name and description); none fits → `history_groups`: if a group for this service and
+   kind of change exists, offer `save_template_from_history` first, else say so and offer the closest.
 4. `list_examples` → read one or two archived examples of the same category (`read_example`) and use their
    wording, field values and task sequence as the reference. If the user names an earlier change,
    `get_change` it instead.

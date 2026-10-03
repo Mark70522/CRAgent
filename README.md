@@ -73,6 +73,8 @@ ice:
 
 **React 界面**:http://127.0.0.1:7777/app/ 。日课(今天:今天做 / 盯着 / 随手记 / 收工;任务:历史、搜索、退回;知识沉淀),变更单列表 / 详情(读、编辑保存、task 建 / 取消 / 关闭、ICE 关联)/ 新建(模板起草、校验、创建),ICE 列表 / 详情(查分数、历史)/ 登记,本地台账,字段目录。http://127.0.0.1:7777/ 直接跳到它。源码在 `web/`,构建产物已提交到 `src/main/resources/static/app`,公司机器只需要 Maven。改前端:在家 `cd web && npm install && npm run dev`(代理到 7777),改完 `npm run build` 再 `mvn package` 提交。REST 在 `/api/v1`,返回体 `{code, message, data}`。
 
+**历史变更单 → 分类 → 模板**:页面「历史与分类」里贴单号(走 get-change)或贴接口导出的 JSON 导入;系统按服务(`servicenow.service-field`,默认 `business_service`,回退 `cmdb_ci`)和标题模式(服务器名、日期、数字抹掉)分组,给出每组数量、最近一张、一致率 ≥60% 的字段。点「存成模板」就写出 `knowledge/templates/<名字>.yaml`:一致字段做默认值、标题模式、最近一张的 task 和描述标题;「模板」页改 YAML,新建变更单和 Copilot 的 create-cr 立刻能用。Copilot 侧对应 `import_changes`、`history_groups`、`save_template_from_history`。
+
 **字段不写死**:表单按 `knowledge/forms/{change,task,ice}.json` 渲染(key、标签、类型、分组、必填、只读、选项),接口多返回的键在详情页"收进目录";页面「字段目录」可直接改。代码里只认几个标准键,其余字段原样透传。
 
 页面上点保存、创建就是你的确认,和 Copilot 里说"创建"一样走同一套闸(硬规则 error 不清零不建),每次点击都进审计日志。留存文件在 `cockpit/records/{change,ice,task}/<单号>.json`:字段、task、硬规则结果、接口原始返回、读取时间。
