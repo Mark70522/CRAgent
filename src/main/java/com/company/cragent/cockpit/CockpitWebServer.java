@@ -57,10 +57,13 @@ public class CockpitWebServer {
     private final FormCatalog forms;
     private final StatusTools status;
     private final AuditLog audit;
+    private final boolean openBrowser;
     private HttpServer server;
 
     public CockpitWebServer(CockpitStore store, CockpitProperties props, ObjectMapper json, ServiceNowTools sn, IceTools ice,
-                            TemplateTools templates, ValidationTools validation, RecordCache cache, FormCatalog forms, StatusTools status, AuditLog audit) {
+                            TemplateTools templates, ValidationTools validation, RecordCache cache, FormCatalog forms, StatusTools status, AuditLog audit,
+                            @org.springframework.beans.factory.annotation.Value("${cockpit.open-browser:false}") boolean openBrowser) {
+        this.openBrowser = openBrowser;
         this.store = store;
         this.props = props;
         this.json = json;
@@ -78,76 +81,35 @@ public class CockpitWebServer {
     void start() {
         try {
             server = HttpServer.create(new InetSocketAddress("127.0.0.1", props.portNumber()), 0);
-            server.createContext("/", this::page);
+            server.createContext("/", this::root);            // anything else -> the React UI
             server.createContext("/app", this::app);          // the React UI (built into static/app)
             server.createContext("/api/v1", this::apiV1);     // REST for the React UI: {code, message, data}
-            server.createContext("/api/state", ex -> respondJson(ex, state()));
-            server.createContext("/api/search", ex -> respondJson(ex, store.search(query(ex).getOrDefault("q", ""), 20)));
-            server.createContext("/api/history", ex -> {
-                Map<String, String> p = query(ex);
-                int limit = 200;
-                try { limit = Integer.parseInt(p.getOrDefault("limit", "200")); } catch (NumberFormatException ignored) {}
-                respondJson(ex, store.history(p.get("q"), p.get("status"), p.get("from"), p.get("to"), p.get("sort"), limit));
-            });
-            server.createContext("/api/toggle", ex -> post(ex, b -> {
-                String id = b.path("id").asText();
-                Task t = store.task(id).orElseThrow();
-                return store.updateTask(id, Map.of("status", "done".equals(t.status) ? "todo" : "done"), null);
-            }));
-            // Page-side task update after the user confirmed in the inline bar: {id, fields:{status|waitingOn|...}, note?}
-            server.createContext("/api/task", ex -> post(ex, b -> {
-                Map<String, String> fields = new LinkedHashMap<>();
-                b.path("fields").fields().forEachRemaining(e -> fields.put(e.getKey(), e.getValue().isNull() ? null : e.getValue().asText()));
-                return store.updateTask(b.path("id").asText(), fields, b.path("note").asText(null));
-            }));
-            server.createContext("/api/note", ex -> post(ex, b -> store.capture(null, b.path("text").asText(), b.path("kind").asText(null), b.path("taskId").asText(null))));
-            server.createContext("/api/save", ex -> post(ex, b -> {
-                var f = store.saveKnowledge(b.path("topic").asText(), b.path("title").asText(), b.path("content").asText(), null, b.path("taskId").asText(null));
-                if (b.has("noteIndex")) store.markNoteSaved(CockpitStore.today(), b.path("noteIndex").asInt());
-                return Map.of("file", f.getFileName().toString());
-            }));
-            server.createContext("/api/close", ex -> post(ex, b -> store.closeDay(null, b.path("summary").asText(""), null)));
-            // Records viewer. Cached copies of every CR / ICE record the tools touched; "live" fetches through the
-            // interface and refreshes the copy. The page never needs the interface just to look at something.
-            // CR page: read live, edit + save (update-change), build a draft from a template, validate, create.
-            // Every POST here is a deliberate click, so it counts as the user's confirmation (confirmed=true).
-            server.createContext("/api/templates", ex -> respondJson(ex, templates.listTemplates()));
-            server.createContext("/api/change/update", ex -> post(ex, b -> sn.updateChange(b.path("number").asText(), fields(b.path("fields")), true)));
-            server.createContext("/api/change/draft", ex -> post(ex, b -> templates.buildDraft(b.path("template").asText(), b.path("servers").asText(""), b.path("start").asText(""), b.path("summary").asText(""))));
-            server.createContext("/api/change/validate", ex -> post(ex, b -> validation.validateDraft(new ChangeDraft(fields(b.path("fields")), tasks(b.path("tasks"))))));
-            server.createContext("/api/change/create", ex -> post(ex, b -> sn.createChange(new ChangeDraft(fields(b.path("fields")), tasks(b.path("tasks"))), true, b.path("taskId").asText(null))));
-            // ICE page: read live, edit + save, draft from a CR, create.
-            server.createContext("/api/ice/update", ex -> post(ex, b -> ice.updateIce(b.path("id").asText(), fields(b.path("fields")), true)));
-            server.createContext("/api/ice/draft", ex -> {
-                String n = query(ex).getOrDefault("number", "").trim();
-                try { respondJson(ex, ice.draftIce(n)); } catch (Exception e) { respondJson(ex, Map.of("error", String.valueOf(e.getMessage()))); }
-            });
-            server.createContext("/api/ice/create", ex -> post(ex, b -> ice.createIce(b.path("changeNumber").asText(), fields(b.path("fields")), true, b.path("taskId").asText(null))));
-            server.createContext("/api/records", ex -> respondJson(ex, cache.list()));
-            server.createContext("/api/record", ex -> {
-                Map<String, String> q = query(ex);
-                String kind = q.getOrDefault("kind", "change").trim(), id = q.getOrDefault("id", "").trim();
-                boolean live = "1".equals(q.get("live"));
-                if (id.isEmpty()) { respondJson(ex, Map.of("error", "id is required")); return; }
-                try {
-                    Map<String, Object> m;
-                    if (live) m = new LinkedHashMap<>("ice".equals(kind) ? ice.getIce(id, null) : sn.getChange(id));
-                    else m = new LinkedHashMap<>(cache.get(kind, id).orElseThrow(() -> new IllegalStateException("not cached: " + kind + " " + id + " (use live=1 or read it in Copilot first)")));
-                    m.put("kind", kind);
-                    m.put("id", id);
-                    linked(m, kind, id);
-                    respondJson(ex, m);
-                } catch (Exception e) {
-                    respondJson(ex, Map.of("error", String.valueOf(e.getMessage())));
-                }
-            });
             server.setExecutor(Executors.newFixedThreadPool(2, r -> { Thread t = new Thread(r, "cockpit-web"); t.setDaemon(true); return t; }));
             server.start();
-            log.info("Cockpit page at http://127.0.0.1:{}/", props.portNumber());
+            log.info("Web UI at http://127.0.0.1:{}/app/", props.portNumber());
         } catch (IOException e) {
-            log.warn("Cockpit web server not started (port {} busy?): {}", props.portNumber(), e.getMessage());
+            log.warn("Web server not started (port {} busy?): {}", props.portNumber(), e.getMessage());
             server = null;
         }
+        // --cockpit.open-browser=true (start.bat / cockpit.vbs): pop the UI. run.bat for Copilot never does.
+        if (openBrowser) openBrowser("http://127.0.0.1:" + props.portNumber() + "/app/");
+    }
+
+    private void openBrowser(String url) {
+        try {
+            String os = System.getProperty("os.name", "").toLowerCase();
+            List<String> cmd = os.contains("win") ? List.of("rundll32", "url.dll,FileProtocolHandler", url) : os.contains("mac") ? List.of("open", url) : List.of("xdg-open", url);
+            new ProcessBuilder(cmd).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        } catch (Exception e) {
+            log.warn("could not open a browser for {}: {}", url, e.getMessage());
+        }
+    }
+
+    /** "/" and anything unknown go to the React UI. */
+    private void root(HttpExchange ex) throws IOException {
+        ex.getResponseHeaders().add("Location", "/app/");
+        ex.sendResponseHeaders(302, -1);
+        ex.close();
     }
 
     @PreDestroy
@@ -373,46 +335,6 @@ public class CockpitWebServer {
     }
 
     // ------------------------------------------------------------------ plumbing
-
-    private void page(HttpExchange ex) throws IOException {
-        if (!"/".equals(ex.getRequestURI().getPath())) { ex.sendResponseHeaders(404, -1); return; }
-        try (InputStream in = getClass().getResourceAsStream("/static/cockpit.html")) {
-            byte[] body = in == null ? "cockpit.html missing".getBytes(StandardCharsets.UTF_8) : in.readAllBytes();
-            ex.getResponseHeaders().add("Content-Type", "text/html; charset=utf-8");
-            ex.sendResponseHeaders(200, body.length);
-            try (OutputStream os = ex.getResponseBody()) { os.write(body); }
-        }
-    }
-
-    interface Action { Object apply(JsonNode body) throws Exception; }
-
-    private void post(HttpExchange ex, Action action) throws IOException {
-        if (!"POST".equalsIgnoreCase(ex.getRequestMethod())) { ex.sendResponseHeaders(405, -1); return; }
-        long t0 = System.currentTimeMillis();
-        String path = ex.getRequestURI().getPath();
-        String raw = "";
-        try {
-            raw = new String(ex.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            JsonNode body = raw.isBlank() ? json.createObjectNode() : json.readTree(raw);
-            Object result = action.apply(body);
-            audit.record("page", path, raw, true, "", System.currentTimeMillis() - t0);
-            respondJson(ex, result);
-        } catch (Exception e) {
-            audit.record("page", path, raw, false, String.valueOf(e.getMessage()), System.currentTimeMillis() - t0);
-            byte[] b = json.writeValueAsBytes(Map.of("error", String.valueOf(e.getMessage())));
-            ex.getResponseHeaders().add("Content-Type", "application/json; charset=utf-8");
-            ex.sendResponseHeaders(400, b.length);
-            try (OutputStream os = ex.getResponseBody()) { os.write(b); }
-        }
-    }
-
-    private void respondJson(HttpExchange ex, Object value) throws IOException {
-        byte[] b = json.writeValueAsBytes(value);
-        ex.getResponseHeaders().add("Content-Type", "application/json; charset=utf-8");
-        ex.getResponseHeaders().add("Cache-Control", "no-store");
-        ex.sendResponseHeaders(200, b.length);
-        try (OutputStream os = ex.getResponseBody()) { os.write(b); }
-    }
 
     private static Map<String, String> query(HttpExchange ex) {
         Map<String, String> m = new LinkedHashMap<>();

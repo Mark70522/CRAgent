@@ -124,7 +124,7 @@ src/main/java/com/company/cragent/
 ├── model/         ChangeDraft(fields + tasks 的 map) CiInfo Violation
 ├── cockpit/       CockpitModel CockpitStore CockpitWebServer
 └── tools/         StatusTools ServiceNowTools InventoryTools TemplateTools ValidationTools KnowledgeTools CockpitTools
-src/main/resources/static/cockpit.html   页面
+src/main/resources/static/app/           React 构建产物(源码在 web/,/ 跳到 /app/)
 src/test/...                             EndpointClientTest(本地 HttpServer)RuleEngineTest TemplateServiceTest InventoryTest CockpitStoreTest
 ```
 

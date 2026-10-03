@@ -31,7 +31,7 @@ export default function AppLayout() {
       <Layout>
         <Header style={{ background: '#fff', paddingInline: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f0f0f0' }}>
           <span style={{ fontSize: 16, fontWeight: 500 }}>日课 · 变更单 · ICE</span>
-          <a href="/" style={{ color: '#888' }}>旧页面 →</a>
+          <span style={{ color: '#888', fontSize: 12 }}>和 Copilot 读写同一批文件</span>
         </Header>
         <Content style={{ margin: 16, padding: 24, background: '#fff', borderRadius: 8, overflow: 'auto' }}>
           <Outlet />

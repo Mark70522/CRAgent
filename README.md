@@ -17,7 +17,7 @@ ServiceNow 的接口**完全由你在配置里描述**,程序不预设任何表�
 mvn -q -DskipTests package        # 产出 target/cr-agent.jar
 ```
 
-**只用页面**:双击 `run.bat`,浏览器开 http://127.0.0.1:7777/ 。关窗口就停。
+**只用页面**:双击 `start.bat`,浏览器自动打开 http://127.0.0.1:7777/app/ 。关窗口就停。(`run.bat` 是给 Copilot 的,不弹浏览器。)
 
 **页面开机自启,不依赖 IntelliJ**:`cockpit-autostart.bat install` 一次,以后登录 Windows 就有页面(后台 javaw,无窗口,日志 `logs/cockpit.log`);`remove` 取消,`start` / `stop` 手动起停。Copilot 之后拉起自己的 cr-agent 时发现端口被占只记一条 warn,工具照常用,两个进程读写的是同一批文件。
 
@@ -71,19 +71,11 @@ ice:
 
 对应工具 `get_ice`、`create_ice`、`update_ice`,建和改要确认。create-cr 建完 CR 会接着提议登 ICE,ICE 号挂在任务上和 CHG 号并排显示。不配 `ice:` 段就是关着的,`status` 会说明,工具会拒绝。要自己写 Java 就 `ice.client: company`,填 `CompanyIceClient.java` 的三个 TODO。
 
-**React 界面**:http://127.0.0.1:7777/app/ 。日课(今天:今天做 / 盯着 / 随手记 / 收工;任务:历史、搜索、退回;知识沉淀),变更单列表 / 详情(读、编辑保存、task 建 / 取消 / 关闭、ICE 关联)/ 新建(模板起草、校验、创建),ICE 列表 / 详情(查分数、历史)/ 登记,本地台账,字段目录。旧的单页驾驶舱还在 http://127.0.0.1:7777/ ,功能一样,以后会去掉。源码在 `web/`,构建产物已提交到 `src/main/resources/static/app`,公司机器只需要 Maven。改前端:在家 `cd web && npm install && npm run dev`(代理到 7777),改完 `npm run build` 再 `mvn package` 提交。REST 在 `/api/v1`,返回体 `{code, message, data}`。
+**React 界面**:http://127.0.0.1:7777/app/ 。日课(今天:今天做 / 盯着 / 随手记 / 收工;任务:历史、搜索、退回;知识沉淀),变更单列表 / 详情(读、编辑保存、task 建 / 取消 / 关闭、ICE 关联)/ 新建(模板起草、校验、创建),ICE 列表 / 详情(查分数、历史)/ 登记,本地台账,字段目录。http://127.0.0.1:7777/ 直接跳到它。源码在 `web/`,构建产物已提交到 `src/main/resources/static/app`,公司机器只需要 Maven。改前端:在家 `cd web && npm install && npm run dev`(代理到 7777),改完 `npm run build` 再 `mvn package` 提交。REST 在 `/api/v1`,返回体 `{code, message, data}`。
 
 **字段不写死**:表单按 `knowledge/forms/{change,task,ice}.json` 渲染(key、标签、类型、分组、必填、只读、选项),接口多返回的键在详情页"收进目录";页面「字段目录」可直接改。代码里只认几个标准键,其余字段原样透传。
 
-**驾驶舱旧页面上的三个视图**(左栏「变更」):
-
-| 视图 | 能做什么 | 走哪个接口 |
-|---|---|---|
-| 变更单 | 输单号读取;「编辑」改字段,「保存」只发改过的;「新建」选模板、填服务器和时间、生成草稿、改、「校验」、「创建」 | get-change / update-change / create-change |
-| ICE 记录 | 输 ICE 号读取;编辑保存;「新建」输 CR 号,按 `from-change` 算出字段,改完创建 | get-ice / update-ice / create-ice |
-| 本地留存 | 列出读过、建过、改过的每张单,只看不碰接口;CR、ICE、所属任务互相链接;「从接口刷新」才取最新 | 无(刷新时才用 get) |
-
-页面上点保存、创建就是你的确认,和 Copilot 里说"创建"一样走同一套闸(硬规则 error 不清零不建),每次点击都进审计日志。留存文件在 `cockpit/records/{change,ice}/<单号>.json`:字段、task、硬规则结果、接口原始返回、读取时间。
+页面上点保存、创建就是你的确认,和 Copilot 里说"创建"一样走同一套闸(硬规则 error 不清零不建),每次点击都进审计日志。留存文件在 `cockpit/records/{change,ice,task}/<单号>.json`:字段、task、硬规则结果、接口原始返回、读取时间。
 
 接口怎么实现,二选一(`servicenow.client`):
 
