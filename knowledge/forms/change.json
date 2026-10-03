@@ -1,0 +1,28 @@
+{
+  "kind": "change",
+  "fields": [
+    { "key": "number", "label": "单号", "type": "text", "section": "基本", "readonly": true, "order": 1 },
+    { "key": "short_description", "label": "标题", "type": "text", "section": "基本", "required": true, "order": 2 },
+    { "key": "type", "label": "类型", "type": "select", "section": "基本", "options": ["normal", "standard", "emergency"], "order": 3 },
+    { "key": "category", "label": "分类", "type": "text", "section": "基本", "order": 4 },
+    { "key": "risk", "label": "风险", "type": "select", "section": "基本", "options": ["Low", "Moderate", "High"], "order": 5 },
+    { "key": "impact", "label": "影响", "type": "text", "section": "基本", "order": 6 },
+    { "key": "priority", "label": "优先级", "type": "text", "section": "基本", "order": 7 },
+    { "key": "state", "label": "状态", "type": "text", "section": "基本", "readonly": true, "order": 8 },
+    { "key": "approval", "label": "审批", "type": "text", "section": "基本", "readonly": true, "order": 9 },
+    { "key": "cmdb_ci", "label": "配置项", "type": "text", "section": "对象", "order": 10 },
+    { "key": "assignment_group", "label": "负责组", "type": "text", "section": "对象", "order": 11 },
+    { "key": "assigned_to", "label": "负责人", "type": "text", "section": "对象", "order": 12 },
+    { "key": "requested_by", "label": "申请人", "type": "text", "section": "对象", "order": 13 },
+    { "key": "start_date", "label": "计划开始", "type": "datetime", "section": "时间", "required": true, "order": 20 },
+    { "key": "end_date", "label": "计划结束", "type": "datetime", "section": "时间", "required": true, "order": 21 },
+    { "key": "description", "label": "描述", "type": "textarea", "section": "内容", "required": true, "order": 30 },
+    { "key": "justification", "label": "变更理由", "type": "textarea", "section": "内容", "order": 31 },
+    { "key": "implementation_plan", "label": "实施计划", "type": "textarea", "section": "内容", "order": 32 },
+    { "key": "risk_impact_analysis", "label": "风险与影响分析", "type": "textarea", "section": "内容", "order": 33 },
+    { "key": "backout_plan", "label": "回退方案", "type": "textarea", "section": "内容", "order": 34 },
+    { "key": "test_plan", "label": "测试计划", "type": "textarea", "section": "内容", "order": 35 },
+    { "key": "close_code", "label": "关闭代码", "type": "text", "section": "关闭", "readonly": true, "order": 40 },
+    { "key": "sys_updated_on", "label": "最近更新", "type": "datetime", "section": "关闭", "readonly": true, "order": 41 }
+  ]
+}

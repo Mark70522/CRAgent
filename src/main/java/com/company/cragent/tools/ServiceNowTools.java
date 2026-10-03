@@ -4,6 +4,7 @@ import com.company.cragent.cockpit.CockpitStore;
 import com.company.cragent.cockpit.RecordCache;
 import com.company.cragent.model.ChangeDraft;
 import com.company.cragent.model.ChangeRecord;
+import com.company.cragent.model.TaskRecord;
 import com.company.cragent.model.Violation;
 import com.company.cragent.servicenow.ServiceNowClient;
 import com.company.cragent.validation.RuleEngine;
@@ -83,6 +84,51 @@ public class ServiceNowTools {
         ChangeRecord rec = sn.updateChange(number.trim(), fields == null ? Map.of() : fields);
         log.info("updated change {}", number);
         return cache.putChange(describe(rec), "update");
+    }
+
+    @Tool(name = "create_task", description = """
+            Add one task to an existing change request (create-task endpoint). fields named as the interface expects
+            (short_description, order, assignment_group, planned_start_date, planned_end_date ...).
+            Set confirmed=true only after the user saw the task and said to add it.""")
+    public Map<String, Object> createTask(
+            @ToolParam(description = "Change number the task belongs to") String changeNumber,
+            @ToolParam(description = "Task field name -> value") Map<String, Object> fields,
+            @ToolParam(description = "Must be true; pass true only after the user explicitly confirmed") boolean confirmed) {
+        if (!confirmed) throw new IllegalStateException("Not created: show the user the task and ask for confirmation, then call again with confirmed=true.");
+        TaskRecord t = sn.createTask(changeNumber.trim(), fields == null ? Map.of() : fields);
+        log.info("created task {} on {}", t.id(), changeNumber);
+        return cache.putTask(describe(t), "create");
+    }
+
+    @Tool(name = "cancel_task", description = "Cancel a change task (cancel-task endpoint). fields: whatever the interface wants, e.g. a reason. confirmed=true only after the user agreed.")
+    public Map<String, Object> cancelTask(
+            @ToolParam(description = "Task id") String taskId,
+            @ToolParam(description = "Extra fields, e.g. reason", required = false) Map<String, Object> fields,
+            @ToolParam(description = "Must be true; pass true only after the user explicitly confirmed") boolean confirmed) {
+        if (!confirmed) throw new IllegalStateException("Not cancelled: ask the user to confirm, then call again with confirmed=true.");
+        TaskRecord t = sn.cancelTask(taskId.trim(), fields == null ? Map.of() : fields);
+        log.info("cancelled task {}", taskId);
+        return cache.putTask(describe(t), "cancel");
+    }
+
+    @Tool(name = "close_task", description = "Close a change task (close-task endpoint). fields: e.g. close notes / close code. confirmed=true only after the user agreed.")
+    public Map<String, Object> closeTask(
+            @ToolParam(description = "Task id") String taskId,
+            @ToolParam(description = "Extra fields, e.g. close_notes", required = false) Map<String, Object> fields,
+            @ToolParam(description = "Must be true; pass true only after the user explicitly confirmed") boolean confirmed) {
+        if (!confirmed) throw new IllegalStateException("Not closed: ask the user to confirm, then call again with confirmed=true.");
+        TaskRecord t = sn.closeTask(taskId.trim(), fields == null ? Map.of() : fields);
+        log.info("closed task {}", taskId);
+        return cache.putTask(describe(t), "close");
+    }
+
+    public static Map<String, Object> describe(TaskRecord t) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", t.id());
+        out.put("changeNumber", t.changeNumber());
+        out.put("fields", t.fields());
+        out.put("raw", t.raw());
+        return out;
     }
 
     /** Record -> number, fields, tasks, violations, passed, raw. Shared with the web viewer. */

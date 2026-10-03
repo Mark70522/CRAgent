@@ -32,11 +32,11 @@ public class ConfigCheck {
 
     public Result run() {
         List<String> problems = new ArrayList<>(), notes = new ArrayList<>();
-        checkApi("servicenow", sn, List.of("get-change", "create-change", "update-change"),
-                Map.of("get-change", "number", "update-change", "number"), problems, notes);
+        checkApi("servicenow", sn, List.of("get-change", "create-change", "update-change"), List.of("create-task", "cancel-task", "close-task"),
+                Map.of("get-change", "number", "update-change", "number", "create-task", "number", "cancel-task", "id", "close-task", "id"), problems, notes);
         if (ice.configured() || !ice.endpoints().isEmpty() || (ice.baseUrl() != null && !ice.baseUrl().isBlank())) {
-            checkApi("ice", ice, List.of("get-ice", "create-ice", "update-ice"),
-                    Map.of("get-ice", "id", "update-ice", "id", "create-ice", "number"), problems, notes);
+            checkApi("ice", ice, List.of("get-ice", "create-ice", "update-ice"), List.of("ice-score"),
+                    Map.of("get-ice", "id", "update-ice", "id", "create-ice", "number", "ice-score", "id"), problems, notes);
             if (ice.fromChange().isEmpty()) notes.add("ice.from-change not set: draft_ice cannot derive ICE fields from a CR; Copilot composes them by hand");
             ice.fromChange().forEach((k, v) -> checkPlaceholders("ice.from-change." + k, v, problems));
         } else {
@@ -45,7 +45,7 @@ public class ConfigCheck {
         return new Result(problems.isEmpty(), problems, notes);
     }
 
-    private void checkApi(String name, HttpApi api, List<String> required, Map<String, String> mustMention, List<String> problems, List<String> notes) {
+    private void checkApi(String name, HttpApi api, List<String> required, List<String> optional, Map<String, String> mustMention, List<String> problems, List<String> notes) {
         boolean anything = (api.baseUrl() != null && !api.baseUrl().isBlank()) || !api.endpoints().isEmpty();
         if (!anything) { notes.add(name + ": not configured"); return; }
         if (api.baseUrl() == null || api.baseUrl().isBlank()) problems.add(name + ".base-url is empty");
@@ -55,8 +55,9 @@ public class ConfigCheck {
             notes.add(name + ".client=company: endpoints below are ignored, your Company*Client is used");
         } else {
             for (String ep : required) if (!api.endpoints().containsKey(ep)) problems.add(name + ".endpoints." + ep + " is missing (names are fixed: " + String.join(", ", required) + ")");
+            for (String ep : optional) if (!api.endpoints().containsKey(ep)) notes.add(name + ".endpoints." + ep + " not configured: that operation is off until you add it");
             api.endpoints().forEach((epName, ep) -> {
-                if (!required.contains(epName)) notes.add(name + ".endpoints." + epName + ": unknown name, nothing calls it");
+                if (!required.contains(epName) && !optional.contains(epName)) notes.add(name + ".endpoints." + epName + ": unknown name, nothing calls it");
                 if (ep.path() == null || ep.path().isBlank()) problems.add(name + ".endpoints." + epName + ".path is empty");
                 if (!List.of("GET", "POST", "PUT", "PATCH", "DELETE").contains(ep.method())) problems.add(name + ".endpoints." + epName + ".method '" + ep.method() + "' is not GET/POST/PUT/PATCH/DELETE");
                 checkPlaceholders(name + ".endpoints." + epName + ".path", ep.path(), problems);

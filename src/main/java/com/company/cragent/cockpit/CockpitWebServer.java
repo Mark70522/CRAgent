@@ -3,7 +3,9 @@ package com.company.cragent.cockpit;
 import com.company.cragent.cockpit.CockpitModel.*;
 import com.company.cragent.config.CockpitProperties;
 import com.company.cragent.audit.AuditLog;
+import com.company.cragent.knowledge.FormCatalog;
 import com.company.cragent.tools.IceTools;
+import com.company.cragent.tools.StatusTools;
 import com.company.cragent.model.ChangeDraft;
 import com.company.cragent.tools.ServiceNowTools;
 import com.company.cragent.tools.TemplateTools;
@@ -30,6 +32,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
@@ -51,11 +54,13 @@ public class CockpitWebServer {
     private final TemplateTools templates;
     private final ValidationTools validation;
     private final RecordCache cache;
+    private final FormCatalog forms;
+    private final StatusTools status;
     private final AuditLog audit;
     private HttpServer server;
 
     public CockpitWebServer(CockpitStore store, CockpitProperties props, ObjectMapper json, ServiceNowTools sn, IceTools ice,
-                            TemplateTools templates, ValidationTools validation, RecordCache cache, AuditLog audit) {
+                            TemplateTools templates, ValidationTools validation, RecordCache cache, FormCatalog forms, StatusTools status, AuditLog audit) {
         this.store = store;
         this.props = props;
         this.json = json;
@@ -64,6 +69,8 @@ public class CockpitWebServer {
         this.templates = templates;
         this.validation = validation;
         this.cache = cache;
+        this.forms = forms;
+        this.status = status;
         this.audit = audit;
     }
 
@@ -72,6 +79,8 @@ public class CockpitWebServer {
         try {
             server = HttpServer.create(new InetSocketAddress("127.0.0.1", props.portNumber()), 0);
             server.createContext("/", this::page);
+            server.createContext("/app", this::app);          // the React UI (built into static/app)
+            server.createContext("/api/v1", this::apiV1);     // REST for the React UI: {code, message, data}
             server.createContext("/api/state", ex -> respondJson(ex, state()));
             server.createContext("/api/search", ex -> respondJson(ex, store.search(query(ex).getOrDefault("q", ""), 20)));
             server.createContext("/api/history", ex -> {
@@ -152,6 +161,146 @@ public class CockpitWebServer {
     private List<Map<String, Object>> tasks(JsonNode node) {
         if (node == null || !node.isArray()) return new ArrayList<>();
         return json.convertValue(node, new TypeReference<List<Map<String, Object>>>() {});
+    }
+
+    // ------------------------------------------------------------------ REST v1 (React UI)
+
+    private static final java.util.regex.Pattern SEG = java.util.regex.Pattern.compile("[^/]+");
+
+    /**
+     * One dispatcher for the React UI. Response envelope is what its axios layer expects:
+     * {code:200, message:"ok", data} or {code:500, message}. Every write is a deliberate click = confirmed.
+     */
+    private void apiV1(HttpExchange ex) throws IOException {
+        ex.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+        ex.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type");
+        ex.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        String method = ex.getRequestMethod().toUpperCase();
+        if ("OPTIONS".equals(method)) { ex.sendResponseHeaders(204, -1); return; }
+        String path = ex.getRequestURI().getPath().substring("/api/v1".length());
+        Map<String, String> q = query(ex);
+        long t0 = System.currentTimeMillis();
+        String raw = "";
+        try {
+            raw = "GET".equals(method) ? "" : new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            JsonNode b = raw.isBlank() ? json.createObjectNode() : json.readTree(raw);
+            Object data = route(method, path, q, b);
+            if (!"GET".equals(method)) audit.record("page", "/api/v1" + path, raw, true, "", System.currentTimeMillis() - t0);
+            envelope(ex, 200, "ok", data);
+        } catch (NoSuchElementException e) {
+            envelope(ex, 404, e.getMessage(), null);
+        } catch (Exception e) {
+            if (!"GET".equals(method)) audit.record("page", "/api/v1" + path, raw, false, String.valueOf(e.getMessage()), System.currentTimeMillis() - t0);
+            envelope(ex, 500, String.valueOf(e.getMessage()), null);
+        }
+    }
+
+    private Object route(String m, String path, Map<String, String> q, JsonNode b) throws Exception {
+        List<String> p = new ArrayList<>();
+        java.util.regex.Matcher mt = SEG.matcher(path);
+        while (mt.find()) p.add(URLDecoder.decode(mt.group(), StandardCharsets.UTF_8));
+        String a = p.isEmpty() ? "" : p.get(0), id = p.size() > 1 ? p.get(1) : "", sub = p.size() > 2 ? p.get(2) : "";
+        boolean live = "1".equals(q.get("live")) || "true".equals(q.get("live"));
+
+        switch (a) {
+            case "status" -> { if (p.size() == 1 && m.equals("GET")) return status.status(); }
+            case "templates" -> { if (p.size() == 1 && m.equals("GET")) return templates.listTemplates(); }
+            case "forms" -> {
+                if (p.size() == 2 && m.equals("GET")) return forms.get(id);
+                if (p.size() == 2 && m.equals("PUT")) return forms.save(id, json.convertValue(b.path("fields"), new TypeReference<List<Map<String, Object>>>() {}));
+                if (p.size() == 3 && sub.equals("learn") && m.equals("POST")) return Map.of("added", forms.learn(id, fields(b.path("record").isObject() ? b.path("record") : b.path("fields"))));
+            }
+            case "changes" -> {
+                if (p.size() == 1 && m.equals("GET")) return ledger("change", q);
+                if (p.size() == 1 && m.equals("POST")) return sn.createChange(new ChangeDraft(fields(b.path("fields")), tasks(b.path("tasks"))), true, b.path("taskId").asText(null));
+                if (p.size() == 2 && id.equals("draft") && m.equals("POST")) return templates.buildDraft(b.path("template").asText(), b.path("servers").asText(""), b.path("start").asText(""), b.path("summary").asText(""));
+                if (p.size() == 2 && id.equals("validate") && m.equals("POST")) return validation.validateDraft(new ChangeDraft(fields(b.path("fields")), tasks(b.path("tasks"))));
+                if (p.size() == 2 && m.equals("GET")) return record("change", id, live);
+                if (p.size() == 2 && m.equals("PUT")) return sn.updateChange(id, fields(b.path("fields")), true);
+                if (p.size() == 3 && sub.equals("tasks") && m.equals("GET")) return taskList(id);
+                if (p.size() == 3 && sub.equals("tasks") && m.equals("POST")) return sn.createTask(id, fields(b.path("fields")), true);
+            }
+            case "tasks" -> {
+                if (p.size() == 2 && m.equals("GET")) return cache.get("task", id).orElseThrow(() -> new NoSuchElementException("task not cached: " + id));
+                if (p.size() == 3 && sub.equals("cancel") && m.equals("POST")) return sn.cancelTask(id, fields(b.path("fields")), true);
+                if (p.size() == 3 && sub.equals("close") && m.equals("POST")) return sn.closeTask(id, fields(b.path("fields")), true);
+            }
+            case "ices" -> {
+                if (p.size() == 1 && m.equals("GET")) return ledger("ice", q);
+                if (p.size() == 1 && m.equals("POST")) return ice.createIce(b.path("changeNumber").asText(), fields(b.path("fields")), true, b.path("taskId").asText(null));
+                if (p.size() == 2 && id.equals("draft") && m.equals("GET")) return ice.draftIce(q.getOrDefault("number", ""));
+                if (p.size() == 2 && m.equals("GET")) return record("ice", id, live);
+                if (p.size() == 2 && m.equals("PUT")) return ice.updateIce(id, fields(b.path("fields")), true);
+                if (p.size() == 3 && sub.equals("score") && m.equals("GET")) return ice.iceScore(id);
+            }
+            case "records" -> { if (p.size() == 1 && m.equals("GET")) return cache.list(); }
+            default -> { }
+        }
+        throw new NoSuchElementException("no route " + m + " /api/v1" + path);
+    }
+
+    /** Ledger rows of one kind, filtered by q (any text) and state. */
+    private List<Map<String, Object>> ledger(String kind, Map<String, String> q) {
+        String text = q.getOrDefault("q", "").trim().toLowerCase(), state = q.getOrDefault("state", "").trim().toLowerCase();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> r : cache.list()) {
+            if (!kind.equals(r.get("kind"))) continue;
+            if (!state.isEmpty() && !state.equals(String.valueOf(r.getOrDefault("state", "")).toLowerCase())) continue;
+            if (!text.isEmpty() && !(r.get("id") + " " + r.get("title") + " " + r.get("state") + " " + r.get("changeNumber")).toLowerCase().contains(text)) continue;
+            out.add(r);
+        }
+        return out;
+    }
+
+    private Map<String, Object> record(String kind, String id, boolean live) {
+        Map<String, Object> m;
+        if (live) m = new LinkedHashMap<>("ice".equals(kind) ? ice.getIce(id, null) : sn.getChange(id));
+        else m = new LinkedHashMap<>(cache.get(kind, id).orElseThrow(() -> new NoSuchElementException("not cached: " + kind + " " + id + " (add ?live=1 to read it from the interface)")));
+        m.put("kind", kind);
+        m.put("id", id);
+        linked(m, kind, id);
+        return m;
+    }
+
+    /** Tasks of a change: the ones the interface returned with the record plus the ones created / changed here. */
+    private Map<String, Object> taskList(String number) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("changeNumber", number);
+        out.put("fromRecord", cache.get("change", number).map(r -> r.get("tasks")).orElse(List.of()));
+        out.put("tracked", cache.tasksOf(number));
+        return out;
+    }
+
+    private void envelope(HttpExchange ex, int code, String message, Object data) throws IOException {
+        Map<String, Object> env = new LinkedHashMap<>();
+        env.put("code", code);
+        env.put("message", message);
+        env.put("data", data);
+        byte[] bytes = json.writeValueAsBytes(env);
+        ex.getResponseHeaders().add("Content-Type", "application/json; charset=utf-8");
+        ex.getResponseHeaders().add("Cache-Control", "no-store");
+        ex.sendResponseHeaders(200, bytes.length);
+        try (OutputStream os = ex.getResponseBody()) { os.write(bytes); }
+    }
+
+    /** Serves the built React app from classpath static/app; unknown paths fall back to index.html (client-side routing). */
+    private void app(HttpExchange ex) throws IOException {
+        String path = ex.getRequestURI().getPath().substring("/app".length());
+        if (path.isEmpty() || path.equals("/")) path = "/index.html";
+        if (path.contains("..")) { ex.sendResponseHeaders(404, -1); return; }
+        byte[] body = resource("/static/app" + path);
+        if (body == null) { body = resource("/static/app/index.html"); path = "/index.html"; }
+        if (body == null) { body = "React UI not built: run `npm run build` in web/ and package again.".getBytes(StandardCharsets.UTF_8); path = "/x.txt"; }
+        String type = path.endsWith(".html") ? "text/html; charset=utf-8" : path.endsWith(".js") ? "application/javascript" : path.endsWith(".css") ? "text/css"
+                : path.endsWith(".svg") ? "image/svg+xml" : path.endsWith(".png") ? "image/png" : path.endsWith(".json") ? "application/json" : path.endsWith(".woff2") ? "font/woff2" : "application/octet-stream";
+        ex.getResponseHeaders().add("Content-Type", type);
+        ex.getResponseHeaders().add("Cache-Control", path.contains("/assets/") ? "max-age=31536000, immutable" : "no-store");
+        ex.sendResponseHeaders(200, body.length);
+        try (OutputStream os = ex.getResponseBody()) { os.write(body); }
+    }
+
+    private byte[] resource(String path) throws IOException {
+        try (InputStream in = getClass().getResourceAsStream(path)) { return in == null ? null : in.readAllBytes(); }
     }
 
     /** Adds what else we know about a record: the cockpit task that owns it, and its counterpart (CR <-> ICE). */

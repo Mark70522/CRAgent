@@ -1,0 +1,12 @@
+{
+  "kind": "ice",
+  "fields": [
+    { "key": "id", "label": "ICE 号", "type": "text", "section": "基本", "readonly": true, "order": 1 },
+    { "key": "change_number", "label": "变更单号", "type": "text", "section": "基本", "required": true, "order": 2 },
+    { "key": "title", "label": "标题", "type": "text", "section": "基本", "required": true, "order": 3 },
+    { "key": "window", "label": "窗口", "type": "text", "section": "基本", "order": 4 },
+    { "key": "scope", "label": "范围", "type": "textarea", "section": "内容", "order": 10 },
+    { "key": "owner_group", "label": "负责组", "type": "text", "section": "基本", "order": 5 },
+    { "key": "score", "label": "分数", "type": "number", "section": "评分", "readonly": true, "order": 20 }
+  ]
+}

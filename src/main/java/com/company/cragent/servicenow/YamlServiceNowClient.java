@@ -3,6 +3,7 @@ package com.company.cragent.servicenow;
 import com.company.cragent.config.ServiceNowProperties;
 import com.company.cragent.model.ChangeDraft;
 import com.company.cragent.model.ChangeRecord;
+import com.company.cragent.model.TaskRecord;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class YamlServiceNowClient implements ServiceNowClient {
 
     public static final String GET = "get-change", CREATE = "create-change", UPDATE = "update-change";
+    public static final String CREATE_TASK = "create-task", CANCEL_TASK = "cancel-task", CLOSE_TASK = "close-task";
 
     private final EndpointClient endpoints;
     private final ServiceNowProperties props;
@@ -61,6 +63,37 @@ public class YamlServiceNowClient implements ServiceNowClient {
         params.put("number", number);
         params.put("fields", f);
         return record(number, endpoints.call(UPDATE, params), UPDATE);
+    }
+
+    @Override
+    public TaskRecord createTask(String changeNumber, Map<String, Object> fields) {
+        Map<String, Object> f = names.out(fields == null ? Map.of() : fields);
+        Map<String, Object> params = new LinkedHashMap<>(f);
+        params.put("number", changeNumber);
+        params.put("fields", f);
+        return task(null, changeNumber, endpoints.call(CREATE_TASK, params));
+    }
+
+    @Override
+    public TaskRecord cancelTask(String taskId, Map<String, Object> fields) { return taskOp(CANCEL_TASK, taskId, fields); }
+
+    @Override
+    public TaskRecord closeTask(String taskId, Map<String, Object> fields) { return taskOp(CLOSE_TASK, taskId, fields); }
+
+    private TaskRecord taskOp(String endpoint, String taskId, Map<String, Object> fields) {
+        Map<String, Object> f = names.out(fields == null ? Map.of() : fields);
+        Map<String, Object> params = new LinkedHashMap<>(f);
+        params.put("id", taskId);
+        params.put("fields", f);
+        return task(taskId, null, endpoints.call(endpoint, params));
+    }
+
+    private TaskRecord task(String id, String changeNumber, JsonNode rec) {
+        Map<String, String> fields = names.in(SnHttp.flatten(rec));
+        String i = id;
+        if (i == null) for (String k : List.of(props.taskIdField(), "number", "id")) { String v = fields.get(k); if (v != null && !v.isBlank()) { i = v; break; } }
+        String cn = changeNumber != null ? changeNumber : fields.getOrDefault("change_request", fields.get("number"));
+        return new TaskRecord(i == null ? "" : i, cn, fields, rec);
     }
 
     private ChangeRecord record(String number, JsonNode rec, String endpoint) {

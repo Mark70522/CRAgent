@@ -39,9 +39,12 @@ public record IceProperties(
          * e.g. {@code title: "${short_description}"}, {@code window: "${start_date} - ${end_date}"}.
          * draft_ice renders this; the user confirms; create_ice sends it.
          */
-        Map<String, String> fromChange) implements HttpApi {
+        Map<String, String> fromChange,
+        /** Which key of the ice-score response (after result path and field-map) holds the score; default score. */
+        String scoreField) implements HttpApi {
 
     @Override public String client() { return client == null || client.isBlank() ? "yaml" : client.trim().toLowerCase(); }
+    public String scoreField() { return scoreField == null || scoreField.isBlank() ? "score" : scoreField.trim(); }
     @Override public Map<String, String> fieldMap() { return fieldMap == null ? Map.of() : fieldMap; }
     public Map<String, String> fromChange() { return fromChange == null ? Map.of() : fromChange; }
     @Override public ServiceNowProperties.Auth auth() { return auth == null ? new ServiceNowProperties.Auth(null, null, null, null, null, null) : auth; }

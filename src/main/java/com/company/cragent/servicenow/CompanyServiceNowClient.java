@@ -2,6 +2,7 @@ package com.company.cragent.servicenow;
 
 import com.company.cragent.model.ChangeDraft;
 import com.company.cragent.model.ChangeRecord;
+import com.company.cragent.model.TaskRecord;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -60,6 +61,32 @@ public class CompanyServiceNowClient implements ServiceNowClient {
         //   JsonNode rec  = SnHttp.path(resp, "data");
         //   return new ChangeRecord(number, SnHttp.flatten(rec), SnHttp.flattenList(rec.get("tasks")), resp);
         throw new ServiceNowException("CompanyServiceNowClient.updateChange is not implemented yet");
+    }
+
+    @Override
+    public TaskRecord createTask(String changeNumber, Map<String, Object> fields) {
+        // TODO task 1/3: add a task to a change.
+        //   Map<String, Object> body = new LinkedHashMap<>(fields); body.put("change_request", changeNumber);
+        //   JsonNode resp = http.post("/change/" + changeNumber + "/task", body);
+        //   JsonNode rec  = SnHttp.path(resp, "data");
+        //   return new TaskRecord(rec.path("sys_id").asText(), changeNumber, SnHttp.flatten(rec), resp);
+        throw new ServiceNowException("CompanyServiceNowClient.createTask is not implemented yet");
+    }
+
+    @Override
+    public TaskRecord cancelTask(String taskId, Map<String, Object> fields) {
+        // TODO task 2/3: cancel a task.
+        //   JsonNode resp = http.post("/task/" + taskId + "/cancel", fields);
+        //   return new TaskRecord(taskId, null, SnHttp.flatten(SnHttp.path(resp, "data")), resp);
+        throw new ServiceNowException("CompanyServiceNowClient.cancelTask is not implemented yet");
+    }
+
+    @Override
+    public TaskRecord closeTask(String taskId, Map<String, Object> fields) {
+        // TODO task 3/3: close a task.
+        //   JsonNode resp = http.post("/task/" + taskId + "/close", fields);
+        //   return new TaskRecord(taskId, null, SnHttp.flatten(SnHttp.path(resp, "data")), resp);
+        throw new ServiceNowException("CompanyServiceNowClient.closeTask is not implemented yet");
     }
 
     @SuppressWarnings("unused")

@@ -2,6 +2,7 @@ package com.company.cragent.servicenow;
 
 import com.company.cragent.model.ChangeDraft;
 import com.company.cragent.model.ChangeRecord;
+import com.company.cragent.model.TaskRecord;
 
 import java.util.Map;
 
@@ -28,6 +29,15 @@ public interface ServiceNowClient {
     /** Change the given fields of an existing change request and return the updated record. */
     ChangeRecord updateChange(String number, Map<String, Object> fields);
 
-    /** One line saying what this client talks to, shown by the sn_endpoints tool. */
+    /** Add one task to an existing change request (create-task). */
+    TaskRecord createTask(String changeNumber, Map<String, Object> fields);
+
+    /** Cancel a task (cancel-task); fields carry whatever the interface wants with it, e.g. a reason. */
+    TaskRecord cancelTask(String taskId, Map<String, Object> fields);
+
+    /** Close a task (close-task); fields e.g. close notes / close code. */
+    TaskRecord closeTask(String taskId, Map<String, Object> fields);
+
+    /** One line saying what this client talks to, shown by the status tool. */
     String describe();
 }

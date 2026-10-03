@@ -11,4 +11,5 @@ public record KnowledgeProperties(Path knowledgeDir) {
     public Path examplesDir()  { return knowledgeDir.resolve("examples"); }
     public Path rejectedDir()  { return knowledgeDir.resolve("rejected"); }
     public Path fixturesDir()  { return knowledgeDir.resolve("fixtures"); }
+    public Path formsDir()     { return knowledgeDir.resolve("forms"); }
 }

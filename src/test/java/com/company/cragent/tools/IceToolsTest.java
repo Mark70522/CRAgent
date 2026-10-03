@@ -36,6 +36,7 @@ class IceToolsTest {
         final List<String> calls = new ArrayList<>();
         boolean configured = true;
         public IceRecord get(String iceId) { calls.add("get " + iceId); return new IceRecord(iceId, Map.of("id", iceId, "title", "patch"), null); }
+        public IceRecord score(String iceId) { calls.add("score " + iceId); return new IceRecord(iceId, Map.of("id", iceId, "score", "87"), null); }
         public IceRecord create(String changeNumber, Map<String, Object> fields) { calls.add("create " + changeNumber + " " + fields); return new IceRecord("ICE-77", Map.of("id", "ICE-77"), null); }
         public IceRecord update(String iceId, Map<String, Object> fields) { calls.add("update " + iceId + " " + fields); return new IceRecord(iceId, Map.of("id", iceId), null); }
         public String describe() { return "recording"; }
@@ -57,8 +58,23 @@ class IceToolsTest {
         cache = new RecordCache(props, new ObjectMapper());
         snTools = new ServiceNowTools(new ServiceNowToolsTest.RecordingClient(), new RuleEngine(Path.of("knowledge/rules/hard-rules.yaml")), cockpit, cache);
         IceProperties iceProps = new IceProperties(null, null, null, null, null, null, null, null, null, null,
-                Map.of("title", "${short_description}", "window", "${start_date} - ${end_date}", "cr", "${number}", "owner", "${assigned_to}"));
+                Map.of("title", "${short_description}", "window", "${start_date} - ${end_date}", "cr", "${number}", "owner", "${assigned_to}"), null);
         tools = new IceTools(ice, cockpit, cache, iceProps, snTools, new ObjectMapper());
+    }
+
+    @Test
+    void scoreIsReadAndKeptAsHistory() {
+        Map<String, Object> s1 = tools.iceScore("ICE-5");
+        assertThat(s1.get("score")).isEqualTo("87");
+        assertThat(s1).doesNotContainKey("hint");
+        tools.iceScore("ICE-5");
+        Map<String, Object> rec = cache.get("ice", "ICE-5").orElseThrow();
+        assertThat(rec.get("score")).isEqualTo("87");
+        assertThat((List<?>) rec.get("scores")).hasSize(2);
+        assertThat(cache.list().get(0).get("score")).isEqualTo("87");
+        // a later full read keeps the score history
+        tools.getIce("ICE-5", "CHG0001");
+        assertThat((List<?>) cache.get("ice", "ICE-5").orElseThrow().get("scores")).hasSize(2);
     }
 
     @Test
@@ -148,7 +164,7 @@ class IceToolsTest {
                 Map.of("get-ice", new ServiceNowProperties.Endpoint("GET", "/ice/${id}", null, null, null, "data", null, null),
                        "create-ice", new ServiceNowProperties.Endpoint("POST", "/ice", null, null, "{\"cr\": ${number}, \"data\": ${fields}}", "data", null, null),
                        "update-ice", new ServiceNowProperties.Endpoint("PUT", "/ice/${id}", null, null, null, "data", null, null)),
-                null, null);
+                null, null, null);
         ObjectMapper json = new ObjectMapper();
         YamlIceClient client = new YamlIceClient(new IceEndpoints(props, new IceHttp(props, json), json), props);
 

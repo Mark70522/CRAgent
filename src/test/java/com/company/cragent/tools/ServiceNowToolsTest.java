@@ -6,6 +6,7 @@ import com.company.cragent.cockpit.RecordCache;
 import com.company.cragent.config.CockpitProperties;
 import com.company.cragent.model.ChangeDraft;
 import com.company.cragent.model.ChangeRecord;
+import com.company.cragent.model.TaskRecord;
 import com.company.cragent.servicenow.ServiceNowClient;
 import com.company.cragent.validation.RuleEngine;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,6 +53,9 @@ class ServiceNowToolsTest {
             fields.forEach((k, v) -> f.put(k, String.valueOf(v)));
             return new ChangeRecord(number, f, List.of(), new ObjectMapper().valueToTree(f));
         }
+        public TaskRecord createTask(String changeNumber, Map<String, Object> fields) { calls.add("task+ " + changeNumber + " " + fields); return new TaskRecord("TASK1", changeNumber, Map.of("sys_id", "TASK1", "short_description", String.valueOf(fields.get("short_description"))), null); }
+        public TaskRecord cancelTask(String taskId, Map<String, Object> fields) { calls.add("task- " + taskId); return new TaskRecord(taskId, null, Map.of("state", "cancelled"), null); }
+        public TaskRecord closeTask(String taskId, Map<String, Object> fields) { calls.add("task# " + taskId); return new TaskRecord(taskId, null, Map.of("state", "closed"), null); }
         public String describe() { return "recording client"; }
     }
 
@@ -146,6 +150,21 @@ class ServiceNowToolsTest {
         Map<String, Object> again = tools.createChange(goodDraft(), true, "T-9999");
         assertThat(again.get("number")).isEqualTo("CHG0099");
         assertThat(again).containsKey("taskLinkError");
+    }
+
+    @Test
+    void taskOperationsNeedConfirmationAndAreCached() {
+        assertThatThrownBy(() -> tools.createTask("CHG0099", Map.of("short_description", "Pre-check"), false)).hasMessageContaining("confirmation");
+        Map<String, Object> t = tools.createTask("CHG0099", Map.of("short_description", "Pre-check"), true);
+        assertThat(t.get("id")).isEqualTo("TASK1");
+        assertThat(cache.get("task", "TASK1")).isPresent();
+        assertThat(cache.tasksOf("CHG0099")).hasSize(1);
+        tools.cancelTask("TASK1", null, true);
+        assertThat(cache.get("task", "TASK1").orElseThrow().get("action")).isEqualTo("cancel");
+        tools.closeTask("TASK1", Map.of("close_notes", "done"), true);
+        assertThat(cache.get("task", "TASK1").orElseThrow().get("action")).isEqualTo("close");
+        assertThat(cache.tasksOf("CHG0099")).hasSize(1);   // changeNumber survives updates that do not carry it
+        assertThat(client.calls).containsExactly("task+ CHG0099 {short_description=Pre-check}", "task- TASK1", "task# TASK1");
     }
 
     @Test

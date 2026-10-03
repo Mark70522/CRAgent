@@ -38,10 +38,13 @@ public record ServiceNowProperties(
          * Optional: canonical name (used by templates, rules, examples, the page) -> the name your interface uses,
          * e.g. {@code short_description: title}. Applied once at the boundary, both directions. Empty = same names.
          */
-        Map<String, String> fieldMap) implements HttpApi {
+        Map<String, String> fieldMap,
+        /** Which key of a task response is the task id (after field-map); default sys_id, then number, id. */
+        String taskIdField) implements HttpApi {
 
     public String client() { return client == null || client.isBlank() ? "yaml" : client.trim().toLowerCase(); }
     public Map<String, String> fieldMap() { return fieldMap == null ? Map.of() : fieldMap; }
+    public String taskIdField() { return taskIdField == null || taskIdField.isBlank() ? "sys_id" : taskIdField.trim(); }
 
     public record Auth(String type, String tokenEnv, String token, String user, String passwordEnv, String password) {
         public String type() { return type == null || type.isBlank() ? "none" : type.trim().toLowerCase(); }

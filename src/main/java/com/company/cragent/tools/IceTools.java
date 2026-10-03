@@ -92,6 +92,19 @@ public class IceTools {
         return cache.putIce(describe(ice.get(iceId.trim())), "get", changeNumber);
     }
 
+    @Tool(name = "ice_score", description = """
+            The ICE score of a record (ice-score endpoint). Returns the score (key ice.score-field, default score),
+            the full response, and appends the reading to the local record's score history.""")
+    public Map<String, Object> iceScore(@ToolParam(description = "ICE record id") String iceId) {
+        ready();
+        IceRecord rec = ice.score(iceId.trim());
+        String score = rec.fields().getOrDefault(props.scoreField(), "");
+        Map<String, Object> out = new LinkedHashMap<>(cache.putScore(iceId.trim(), score, describe(rec)));
+        out.put("score", score);
+        if (score.isBlank()) out.put("hint", "no key '" + props.scoreField() + "' in the response: set ice.score-field in cr-agent.yml to the right key (response keys: " + rec.fields().keySet() + ")");
+        return out;
+    }
+
     @Tool(name = "create_ice", description = """
             Register a change request in ICE (the second system every CR has to be entered in). fields are named
             exactly as the ICE interface expects. Set confirmed=true only after the user saw the fields and said

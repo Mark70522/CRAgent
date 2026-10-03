@@ -18,7 +18,7 @@ import java.util.Map;
 @ConditionalOnProperty(name = "ice.client", havingValue = "yaml", matchIfMissing = true)
 public class YamlIceClient implements IceClient {
 
-    public static final String GET = "get-ice", CREATE = "create-ice", UPDATE = "update-ice";
+    public static final String GET = "get-ice", CREATE = "create-ice", UPDATE = "update-ice", SCORE = "ice-score";
 
     private final IceEndpoints endpoints;
     private final IceProperties props;
@@ -41,6 +41,11 @@ public class YamlIceClient implements IceClient {
     @Override
     public IceRecord get(String iceId) {
         return record(iceId, endpoints.call(GET, Map.of("id", iceId)));
+    }
+
+    @Override
+    public IceRecord score(String iceId) {
+        return record(iceId, endpoints.call(SCORE, Map.of("id", iceId)));
     }
 
     @Override

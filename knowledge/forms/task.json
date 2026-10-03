@@ -1,0 +1,15 @@
+{
+  "kind": "task",
+  "fields": [
+    { "key": "sys_id", "label": "任务 ID", "type": "text", "section": "基本", "readonly": true, "order": 1 },
+    { "key": "number", "label": "编号", "type": "text", "section": "基本", "readonly": true, "order": 2 },
+    { "key": "short_description", "label": "标题", "type": "text", "section": "基本", "required": true, "order": 3 },
+    { "key": "order", "label": "顺序", "type": "number", "section": "基本", "order": 4 },
+    { "key": "assignment_group", "label": "负责组", "type": "text", "section": "基本", "order": 5 },
+    { "key": "state", "label": "状态", "type": "text", "section": "基本", "readonly": true, "order": 6 },
+    { "key": "planned_start_date", "label": "计划开始", "type": "datetime", "section": "时间", "order": 10 },
+    { "key": "planned_end_date", "label": "计划结束", "type": "datetime", "section": "时间", "order": 11 },
+    { "key": "description", "label": "描述", "type": "textarea", "section": "内容", "order": 20 },
+    { "key": "close_notes", "label": "关闭说明", "type": "textarea", "section": "关闭", "order": 30 }
+  ]
+}

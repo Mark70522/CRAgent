@@ -18,6 +18,9 @@ public interface IceClient {
     /** Update fields of an existing ICE record. */
     IceRecord update(String iceId, Map<String, Object> fields);
 
+    /** The ICE score of a record (ice-score); the score sits in fields under ice.score-field. */
+    IceRecord score(String iceId);
+
     /** One line for the status tool: which implementation, which address, or "not configured". */
     String describe();
 

@@ -57,10 +57,10 @@ class IntegrationToolsTest {
     static String base() { return "http://127.0.0.1:" + server.getAddress().getPort(); }
 
     static ServiceNowProperties snProps(String baseUrl, Map<String, Endpoint> endpoints, Map<String, String> fieldMap) {
-        return new ServiceNowProperties(baseUrl, new Auth("bearer", "CR_AGENT_TEST_TOKEN_UNSET", null, null, null, null), Map.of("X-Gateway", "g"), null, null, 3000, "yaml", endpoints, fieldMap);
+        return new ServiceNowProperties(baseUrl, new Auth("bearer", "CR_AGENT_TEST_TOKEN_UNSET", null, null, null, null), Map.of("X-Gateway", "g"), null, null, 3000, "yaml", endpoints, fieldMap, null);
     }
 
-    static IceProperties iceOff() { return new IceProperties(null, null, null, null, null, null, null, null, null, null, null); }
+    static IceProperties iceOff() { return new IceProperties(null, null, null, null, null, null, null, null, null, null, null, null); }
 
     IntegrationTools tools(ServiceNowProperties sn) {
         ObjectMapper json = new ObjectMapper();
@@ -94,7 +94,7 @@ class IntegrationToolsTest {
         // really sending needs the token -> clear error, nothing silently sent with an empty header
         assertThatThrownBy(() -> t.probe("servicenow", "get-change", Map.of("number", "CHG0007"), true)).hasMessageContaining("CR_AGENT_TEST_TOKEN_UNSET");
 
-        IntegrationTools open = tools(new ServiceNowProperties(base(), new Auth("none", null, null, null, null, null), null, null, null, 3000, "yaml", eps, null));
+        IntegrationTools open = tools(new ServiceNowProperties(base(), new Auth("none", null, null, null, null, null), null, null, null, 3000, "yaml", eps, null, null));
         Map<String, Object> live = open.probe("servicenow", "get-change", Map.of("number", "CHG0007"), true);
         assertThat(live.get("sent")).isEqualTo(true);
         assertThat(live.get("resultFound")).isEqualTo(true);
@@ -131,7 +131,7 @@ class IntegrationToolsTest {
                 "get-change", new Endpoint("GET", "/api/change/${number}", null, null, null, "result", "tasks", null),
                 "create-change", new Endpoint("POST", "/api/change", null, null, null, "result", null, null),
                 "update-change", new Endpoint("PATCH", "/api/change/${number}", null, null, null, "result", null, null));
-        ConfigCheck.Result ok = new ConfigCheck(new ServiceNowProperties("https://x", new Auth("none", null, null, null, null, null), null, null, null, null, null, good, null), iceOff()).run();
+        ConfigCheck.Result ok = new ConfigCheck(new ServiceNowProperties("https://x", new Auth("none", null, null, null, null, null), null, null, null, null, null, good, null, null), iceOff()).run();
         assertThat(ok.ok()).isTrue();
         assertThat(ok.problems()).isEmpty();
     }

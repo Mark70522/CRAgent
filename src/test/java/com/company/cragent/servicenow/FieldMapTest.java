@@ -67,7 +67,7 @@ class FieldMapTest {
         fieldMap.put("order", "seq");                 // task fields go through the same map
         fieldMap.put("short_description_task", "name");
         var props = new ServiceNowProperties("http://127.0.0.1:" + server.getAddress().getPort(), new Auth("none", null, null, null, null, null),
-                null, null, null, 3000, "yaml", eps, fieldMap);
+                null, null, null, 3000, "yaml", eps, fieldMap, null);
         ObjectMapper json = new ObjectMapper();
         YamlServiceNowClient client = new YamlServiceNowClient(new EndpointClient(props, json), props);
         received.clear();

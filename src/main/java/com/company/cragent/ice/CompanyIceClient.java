@@ -36,6 +36,15 @@ public class CompanyIceClient implements IceClient {
     }
 
     @Override
+    public IceRecord score(String iceId) {
+        // TODO: the ICE score. Example:
+        //   JsonNode resp = http.get("/ice/" + iceId + "/score");
+        //   JsonNode rec  = SnHttp.path(resp, "data");           // must contain the key named by ice.score-field
+        //   return new IceRecord(iceId, SnHttp.flatten(rec), resp);
+        throw new ServiceNowException("CompanyIceClient.score is not implemented yet");
+    }
+
+    @Override
     public IceRecord create(String changeNumber, Map<String, Object> fields) {
         // TODO 2/3: register the change request in ICE. Example:
         //   Map<String, Object> body = new LinkedHashMap<>(fields);

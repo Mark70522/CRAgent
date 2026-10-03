@@ -61,14 +61,14 @@ class FixtureReplayTest {
             String base = "http://127.0.0.1:" + server.getAddress().getPort();
             if ("ice".equals(api)) {
                 assertThat(ice).as("ice: section in cr-agent.yml").isNotNull();
-                IceProperties local = new IceProperties(base, noAuth(), ice.headers(), null, null, ice.timeoutMs(), "yaml", ice.idField(), ice.endpoints(), ice.fieldMap(), ice.fromChange());
+                IceProperties local = new IceProperties(base, noAuth(), ice.headers(), null, null, ice.timeoutMs(), "yaml", ice.idField(), ice.endpoints(), ice.fieldMap(), ice.fromChange(), ice.scoreField());
                 var client = new com.company.cragent.ice.YamlIceClient(new IceEndpoints(local, new IceHttp(local, json), json), local);
                 var rec = "get-ice".equals(endpoint) ? client.get(String.valueOf(params.get("id"))) : client.get(String.valueOf(params.getOrDefault("id", "")));
                 assertThat(rec.id()).as("ICE id via ice.id-field=" + local.idField()).isNotBlank();
                 assertThat(rec.fields()).as("ICE fields at result path").isNotEmpty();
             } else {
                 assertThat(sn).as("servicenow: section in cr-agent.yml").isNotNull();
-                ServiceNowProperties local = new ServiceNowProperties(base, noAuth(), sn.headers(), null, null, sn.timeoutMs(), "yaml", sn.endpoints(), sn.fieldMap());
+                ServiceNowProperties local = new ServiceNowProperties(base, noAuth(), sn.headers(), null, null, sn.timeoutMs(), "yaml", sn.endpoints(), sn.fieldMap(), sn.taskIdField());
                 var client = new YamlServiceNowClient(new EndpointClient(local, json), local);
                 var rec = client.getChange(String.valueOf(params.getOrDefault("number", "")));
                 assertThat(rec.fields()).as("fields at result path '" + ep(local, endpoint).result() + "'").isNotEmpty();
