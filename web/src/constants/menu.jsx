@@ -20,6 +20,8 @@ export const menuItems = [
     children: [
       { key: '/changes', label: '变更单列表' },
       { key: '/changes/new', label: '新建变更单' },
+      { key: '/history', label: '历史与分类' },
+      { key: '/templates', label: '模板' },
     ],
   },
   {

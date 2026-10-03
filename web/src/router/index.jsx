@@ -9,6 +9,8 @@ import IceDetailPage from '../features/ice/IceDetailPage'
 import IceNewPage from '../features/ice/IceNewPage'
 import LedgerPage from '../features/ledger/LedgerPage'
 import FormsPage from '../features/forms/FormsPage'
+import HistoryPage from '../features/history/HistoryPage'
+import TemplatesPage from '../features/history/TemplatesPage'
 import TodayPage from '../features/cockpit/TodayPage'
 import TodosPage from '../features/cockpit/TodosPage'
 import KnowledgePage from '../features/cockpit/KnowledgePage'
@@ -25,6 +27,8 @@ export default function AppRouter() {
         <Route path="changes" element={<ChangeListPage />} />
         <Route path="changes/new" element={<ChangeNewPage />} />
         <Route path="changes/:number" element={<ChangeDetailPage />} />
+        <Route path="history" element={<HistoryPage />} />
+        <Route path="templates" element={<TemplatesPage />} />
         <Route path="ices" element={<IceListPage />} />
         <Route path="ices/new" element={<IceNewPage />} />
         <Route path="ices/:id" element={<IceDetailPage />} />

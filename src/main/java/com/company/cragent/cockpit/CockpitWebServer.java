@@ -4,6 +4,7 @@ import com.company.cragent.cockpit.CockpitModel.*;
 import com.company.cragent.config.CockpitProperties;
 import com.company.cragent.audit.AuditLog;
 import com.company.cragent.knowledge.FormCatalog;
+import com.company.cragent.knowledge.HistoryService;
 import com.company.cragent.tools.IceTools;
 import com.company.cragent.tools.StatusTools;
 import com.company.cragent.model.ChangeDraft;
@@ -56,14 +57,17 @@ public class CockpitWebServer {
     private final RecordCache cache;
     private final FormCatalog forms;
     private final StatusTools status;
+    private final HistoryService history;
     private final AuditLog audit;
     private final boolean openBrowser;
     private HttpServer server;
 
     public CockpitWebServer(CockpitStore store, CockpitProperties props, ObjectMapper json, ServiceNowTools sn, IceTools ice,
-                            TemplateTools templates, ValidationTools validation, RecordCache cache, FormCatalog forms, StatusTools status, AuditLog audit,
+                            TemplateTools templates, ValidationTools validation, RecordCache cache, FormCatalog forms, StatusTools status,
+                            HistoryService history, AuditLog audit,
                             @org.springframework.beans.factory.annotation.Value("${cockpit.open-browser:false}") boolean openBrowser) {
         this.openBrowser = openBrowser;
+        this.history = history;
         this.store = store;
         this.props = props;
         this.json = json;
@@ -196,6 +200,22 @@ public class CockpitWebServer {
                 if (p.size() == 3 && sub.equals("score") && m.equals("GET")) return ice.iceScore(id);
             }
             case "records" -> { if (p.size() == 1 && m.equals("GET")) return cache.list(); }
+            // ---- history: import, groups, templates from groups; template YAML editing
+            case "history" -> {
+                if (p.size() == 2 && id.equals("import") && m.equals("POST")) {
+                    Map<String, Object> out = new LinkedHashMap<>();
+                    out.put("byNumber", history.importNumbers(json.convertValue(b.path("numbers"), new TypeReference<List<String>>() {})));
+                    out.put("byRecord", history.importRecords(json.convertValue(b.path("records"), new TypeReference<List<Map<String, Object>>>() {})));
+                    return out;
+                }
+                if (p.size() == 2 && id.equals("groups") && m.equals("GET")) return history.groups();
+                if (p.size() == 2 && id.equals("template") && m.equals("POST")) return history.templateFromGroup(b.path("groupKey").asText(), b.path("name").asText(null));
+            }
+            case "template-files" -> {
+                if (p.size() == 2 && m.equals("GET")) return Map.of("name", id, "yaml", history.readTemplate(id));
+                if (p.size() == 2 && m.equals("PUT")) return history.writeTemplate(id, b.path("yaml").asText(""));
+                if (p.size() == 2 && m.equals("DELETE")) return Map.of("deleted", history.deleteTemplate(id));
+            }
             // ---- daily cockpit (same files the MCP tools use)
             case "day" -> {
                 if (p.size() == 1 && m.equals("GET")) return state();

@@ -27,7 +27,8 @@ public class ToolRegistry {
         GROUPS.put("cr", List.of("lookup_ci", "lookup_service", "list_templates", "get_template", "build_draft", "validate_draft", "validate_change",
                 "create_change", "update_change", "create_task", "cancel_task", "close_task",
                 "read_rules", "list_examples", "read_example", "draft_ice", "get_ice", "create_ice", "update_ice", "ice_score"));
-        GROUPS.put("learn", List.of("read_rules", "add_hard_rule", "add_soft_rule", "save_example", "save_rejected", "eval_rules", "list_examples", "read_example"));
+        GROUPS.put("learn", List.of("read_rules", "add_hard_rule", "add_soft_rule", "save_example", "save_rejected", "eval_rules", "list_examples", "read_example",
+                "import_changes", "history_groups", "save_template_from_history"));
         GROUPS.put("cockpit", List.of("add_tasks", "list_tasks", "update_task", "task_notes", "plan_day", "capture_note", "close_day",
                 "save_knowledge", "read_knowledge", "task_history", "cockpit_url"));
         GROUPS.put("integration", List.of("check_config", "probe", "save_fixture"));

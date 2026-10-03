@@ -28,10 +28,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * The guards around the three ServiceNow operations, exercised with an in-memory ServiceNowClient that
  * lives only in this test. It records what it was asked to do; it is not sample data.
  */
-class ServiceNowToolsTest {
+public class ServiceNowToolsTest {
 
     /** Minimal in-test client: remembers calls, returns what it was given. */
-    static class RecordingClient implements ServiceNowClient {
+    public static class RecordingClient implements ServiceNowClient {
         final List<String> calls = new ArrayList<>();
         final Map<String, Map<String, String>> store = new HashMap<>();
         public ChangeRecord getChange(String number) {
