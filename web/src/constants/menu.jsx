@@ -1,8 +1,18 @@
-import { DashboardOutlined, FileTextOutlined, SafetyCertificateOutlined, DatabaseOutlined, SettingOutlined } from '@ant-design/icons'
+import { DashboardOutlined, FileTextOutlined, SafetyCertificateOutlined, DatabaseOutlined, SettingOutlined, CalendarOutlined } from '@ant-design/icons'
 
 // Leaf key = route path.
 export const menuItems = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '总览' },
+  {
+    key: 'cockpit',
+    icon: <CalendarOutlined />,
+    label: '日课',
+    children: [
+      { key: '/today', label: '今天' },
+      { key: '/todos', label: '任务' },
+      { key: '/knowledge', label: '知识沉淀' },
+    ],
+  },
   {
     key: 'change',
     icon: <FileTextOutlined />,

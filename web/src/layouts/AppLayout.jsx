@@ -23,15 +23,15 @@ export default function AppLayout() {
           mode="inline"
           items={menuItems}
           selectedKeys={[selected]}
-          defaultOpenKeys={['change', 'ice', 'settings']}
+          defaultOpenKeys={['cockpit', 'change', 'ice', 'settings']}
           onClick={(e) => navigate(e.key)}
         />
       </Sider>
 
       <Layout>
         <Header style={{ background: '#fff', paddingInline: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f0f0f0' }}>
-          <span style={{ fontSize: 16, fontWeight: 500 }}>变更单 · ICE 管理</span>
-          <a href="/" style={{ color: '#888' }}>日课驾驶舱 →</a>
+          <span style={{ fontSize: 16, fontWeight: 500 }}>日课 · 变更单 · ICE</span>
+          <a href="/" style={{ color: '#888' }}>旧页面 →</a>
         </Header>
         <Content style={{ margin: 16, padding: 24, background: '#fff', borderRadius: 8, overflow: 'auto' }}>
           <Outlet />

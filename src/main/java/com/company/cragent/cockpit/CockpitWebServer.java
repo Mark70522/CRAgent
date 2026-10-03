@@ -234,6 +234,41 @@ public class CockpitWebServer {
                 if (p.size() == 3 && sub.equals("score") && m.equals("GET")) return ice.iceScore(id);
             }
             case "records" -> { if (p.size() == 1 && m.equals("GET")) return cache.list(); }
+            // ---- daily cockpit (same files the MCP tools use)
+            case "day" -> {
+                if (p.size() == 1 && m.equals("GET")) return state();
+                if (p.size() == 2 && id.equals("note") && m.equals("POST")) return store.capture(null, b.path("text").asText(), b.path("kind").asText(null), b.path("taskId").asText(null));
+                if (p.size() == 2 && id.equals("close") && m.equals("POST")) return store.closeDay(null, b.path("summary").asText(""), json.convertValue(b.path("tomorrow"), new TypeReference<List<String>>() {}));
+                if (p.size() == 2 && id.equals("plan") && m.equals("POST")) return store.planDay(null, json.convertValue(b.path("taskIds"), new TypeReference<List<String>>() {}), b.path("brief").asText(null), null);
+            }
+            case "todos" -> {
+                if (p.size() == 1 && m.equals("GET")) {
+                    String st = q.getOrDefault("status", "open");
+                    return store.tasks().stream().filter(t -> switch (st) { case "all" -> true; case "open" -> t.isOpen(); case "actionable" -> t.isActionable(); default -> st.equals(t.status); }).collect(Collectors.toList());
+                }
+                if (p.size() == 1 && m.equals("POST")) {
+                    List<Task> in = json.convertValue(b.path("tasks"), new TypeReference<List<Task>>() {});
+                    CockpitStore.AddResult r = store.addTasks(in, b.path("source").asText("manual"));
+                    return Map.of("created", r.created(), "mergedInto", r.merged(), "related", r.related());
+                }
+                if (p.size() == 2 && id.equals("history") && m.equals("GET")) return store.history(q.get("q"), q.get("status"), q.get("from"), q.get("to"), q.get("sort"), 300);
+                if (p.size() == 2 && m.equals("PUT")) {
+                    Map<String, String> f = new LinkedHashMap<>();
+                    b.path("fields").fields().forEachRemaining(e -> f.put(e.getKey(), e.getValue().isNull() ? null : e.getValue().asText()));
+                    return store.updateTask(id, f, b.path("note").asText(null));
+                }
+                if (p.size() == 3 && sub.equals("notes") && m.equals("GET")) return Map.of("id", id, "notes", store.taskNotes(id));
+            }
+            case "knowledge" -> {
+                if (p.size() == 1 && m.equals("GET")) return store.knowledgeCards();
+                if (p.size() == 1 && m.equals("POST")) {
+                    var f = store.saveKnowledge(b.path("topic").asText(), b.path("title").asText(), b.path("content").asText(), null, b.path("taskId").asText(null));
+                    if (b.has("noteIndex") && !b.path("noteIndex").isNull()) store.markNoteSaved(CockpitStore.today(), b.path("noteIndex").asInt());
+                    return Map.of("file", f.getFileName().toString());
+                }
+                if (p.size() == 2 && m.equals("GET")) return Map.of("topic", id, "text", store.readKnowledge(id));
+            }
+            case "search" -> { if (p.size() == 1 && m.equals("GET")) return store.search(q.getOrDefault("q", ""), 30); }
             default -> { }
         }
         throw new NoSuchElementException("no route " + m + " /api/v1" + path);

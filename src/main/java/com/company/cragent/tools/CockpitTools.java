@@ -252,13 +252,24 @@ public class CockpitTools {
     }
 
     @Tool(name = "open_cockpit", description = """
-            Open the cockpit page in the user's default browser (local page, nothing leaves the machine).
+            Open the web UI in the user's default browser (local page, nothing leaves the machine).
             Call it once at the start of the morning brief and whenever the user asks to see the page.
-            view: morning | day | evening | history | knowledge | change (CR page) | ice | records (local copies). Default morning.""")
+            view: today (default; morning / day / evening also land here) | todos (task history) | knowledge |
+            changes | ices | ledger (local copies) | dashboard.""")
     public String openCockpit(@ToolParam(description = "Which view to open, default morning", required = false) String view) {
         if (!props.webEnabled()) return "(cockpit web page is disabled: cockpit.web=false)";
         String v = view == null || view.isBlank() ? "morning" : view.trim().toLowerCase();
-        String url = url() + "#" + v;
+        // the React UI: old view names map onto its routes; unknown names fall back to the day page
+        String route = switch (v) {
+            case "history", "todos", "tasks" -> "todos";
+            case "knowledge" -> "knowledge";
+            case "change", "changes", "cr" -> "changes";
+            case "ice", "ices" -> "ices";
+            case "records", "ledger" -> "ledger";
+            case "dashboard", "status" -> "dashboard";
+            default -> "today";
+        };
+        String url = url() + "app/" + route;
         try {
             String os = System.getProperty("os.name", "").toLowerCase();
             List<String> cmd = os.contains("win") ? List.of("rundll32", "url.dll,FileProtocolHandler", url)
