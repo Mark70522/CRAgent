@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Card, Collapse, Space, Tag, Typography, App } from 'antd'
+import { Alert, Button, Card, Space, Tag, Typography, App } from 'antd'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import JsonForm, { diffFields } from '../../components/JsonForm'
+import JsonPanel from '../../components/JsonPanel'
 import TaskPanel from './TaskPanel'
 import { changeApi, formsApi } from './changeApi'
 
@@ -20,7 +21,7 @@ export default function ChangeDetailPage() {
 
   async function load(live) {
     setErr(''); setBusy(true)
-    try { const r = await changeApi.get(number, live); setRec(r); setValue(r.fields || {}); setEditing(false) }
+    try { const r = await changeApi.get(number, live); setRec(r); setValue(r.fields || {}); setEditing(params.get('edit') === '1' && !editing ? true : false) }
     catch (e) { setErr(e.message); if (!live) setRec(null) }
     finally { setBusy(false) }
   }
@@ -86,7 +87,7 @@ export default function ChangeDetailPage() {
           <Card size="small" style={{ marginBottom: 12 }}>
             <TaskPanel number={number} recordTasks={rec.tasks || []} />
           </Card>
-          <Collapse size="small" items={[{ key: 'raw', label: '接口原始返回', children: <pre style={{ fontSize: 12, maxHeight: 400, overflow: 'auto' }}>{JSON.stringify(rec.raw, null, 2)}</pre> }]} />
+          <JsonPanel fields={rec.fields} raw={rec.raw} />
         </>
       )}
     </div>

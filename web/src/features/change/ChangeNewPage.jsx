@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Card, Input, Select, Space, Table, Tag, Typography, App } from 'antd'
+import { Alert, Button, Card, Col, Form, Input, Row, Select, Space, Steps, Table, Tag, Typography, App } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import JsonForm from '../../components/JsonForm'
 import { changeApi, formsApi } from './changeApi'
@@ -8,13 +8,10 @@ import { changeApi, formsApi } from './changeApi'
 export default function ChangeNewPage() {
   const { message } = App.useApp()
   const navigate = useNavigate()
+  const [form] = Form.useForm()
   const [templates, setTemplates] = useState([])
   const [catalog, setCatalog] = useState([])
   const [taskCatalog, setTaskCatalog] = useState([])
-  const [tpl, setTpl] = useState('')
-  const [servers, setServers] = useState('')
-  const [start, setStart] = useState('')
-  const [summary, setSummary] = useState('')
   const [notes, setNotes] = useState([])
   const [fields, setFields] = useState(null)
   const [tasks, setTasks] = useState([])
@@ -22,15 +19,16 @@ export default function ChangeNewPage() {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    changeApi.templates().then((t) => { setTemplates(t); if (t[0]) setTpl(t[0].name) }).catch((e) => message.error(e.message))
+    changeApi.templates().then((t) => { setTemplates(t); if (t[0]) form.setFieldValue('template', t[0].name) }).catch((e) => message.error(e.message))
     formsApi.get('change').then((c) => setCatalog(c.fields)).catch(() => {})
     formsApi.get('task').then((c) => setTaskCatalog(c.fields)).catch(() => {})
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function draft() {
+    let v; try { v = await form.validateFields() } catch { return }
     setBusy(true); setResult(null)
     try {
-      const d = await changeApi.draft({ template: tpl, servers, start, summary })
+      const d = await changeApi.draft(v)
       setFields(d.draft.fields || {}); setTasks(d.draft.tasks || []); setNotes(d.notes || [])
     } catch (e) { message.error(e.message) } finally { setBusy(false) }
   }
@@ -44,39 +42,46 @@ export default function ChangeNewPage() {
     catch (e) { message.error(e.message) } finally { setBusy(false) }
   }
 
+  const step = !fields ? 0 : result ? (result.passed ? 3 : 2) : 1
   const taskKeys = tasks.length ? [...new Set(tasks.flatMap((t) => Object.keys(t)))] : taskCatalog.filter((f) => !f.readonly).map((f) => f.key).slice(0, 5)
   const taskColumns = [
-    ...taskKeys.map((k) => ({ title: (taskCatalog.find((f) => f.key === k) || {}).label || k, dataIndex: k, render: (v, _, i) => <Input size="small" value={v ?? ''} onChange={(e) => { const n = tasks.map((t, j) => j === i ? { ...t, [k]: e.target.value } : t); setTasks(n) }} /> })),
-    { title: '', width: 60, render: (_, __, i) => <Button size="small" danger onClick={() => setTasks(tasks.filter((_, j) => j !== i))}>×</Button> },
+    ...taskKeys.map((k) => ({ title: (taskCatalog.find((f) => f.key === k) || {}).label || k, dataIndex: k, render: (v, _, i) => <Input size="small" value={v ?? ''} onChange={(e) => setTasks(tasks.map((t, j) => j === i ? { ...t, [k]: e.target.value } : t))} /> })),
+    { title: '', width: 50, render: (_, __, i) => <Button size="small" type="text" danger onClick={() => setTasks(tasks.filter((_, j) => j !== i))}>×</Button> },
   ]
 
   return (
     <div>
-      <Typography.Title level={4} style={{ marginTop: 0 }}>新建变更单</Typography.Title>
-      <Card size="small" title="1. 起草" style={{ marginBottom: 12 }}>
-        <Space wrap>
-          <Select value={tpl || undefined} onChange={setTpl} style={{ width: 260 }} placeholder="模板" options={templates.map((t) => ({ value: t.name, label: `${t.name} · ${t.description || ''}` }))} />
-          <Input value={servers} onChange={(e) => setServers(e.target.value)} placeholder="服务器,逗号分隔" style={{ width: 260 }} />
-          <Input value={start} onChange={(e) => setStart(e.target.value)} placeholder="计划开始 yyyy-MM-dd HH:mm:ss" style={{ width: 230 }} />
-          <Input value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="一句话摘要" style={{ width: 300 }} />
-          <Button type="primary" onClick={draft} loading={busy} disabled={!tpl}>生成草稿</Button>
-        </Space>
-        {notes.length > 0 && <Alert style={{ marginTop: 12 }} type="warning" showIcon message={<ul style={{ margin: 0, paddingLeft: 18 }}>{notes.map((n) => <li key={n}>{n}</li>)}</ul>} />}
+      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }} wrap>
+        <Typography.Title level={4} style={{ margin: 0 }}>新建变更单</Typography.Title>
+        <Steps size="small" current={step} style={{ maxWidth: 640 }} items={[{ title: '起草' }, { title: '改字段和 task' }, { title: '校验' }, { title: '创建' }]} />
+      </Space>
+
+      <Card size="small" title="起草" style={{ marginBottom: 12 }}>
+        <Form form={form} layout="vertical" requiredMark={false}>
+          <Row gutter={16}>
+            <Col xs={24} md={8}><Form.Item name="template" label="模板" rules={[{ required: true, message: '选一个模板' }]}><Select placeholder="模板" options={templates.map((t) => ({ value: t.name, label: `${t.name} · ${t.description || ''}` }))} /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="servers" label="服务器(逗号分隔,查清单)" rules={[{ required: true, message: '至少一台' }]}><Input placeholder="srv-app-01, srv-app-02" /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="start" label="计划开始" rules={[{ required: true, message: '要有开始时间' }]}><Input placeholder="2026-10-11 01:00:00" /></Form.Item></Col>
+            <Col xs={24} md={16}><Form.Item name="summary" label="一句话摘要(进标题)" rules={[{ required: true, message: '写一句' }]}><Input placeholder="2026-10 Windows monthly security patches" /></Form.Item></Col>
+            <Col xs={24} md={8} style={{ display: 'flex', alignItems: 'flex-end' }}><Form.Item><Button type="primary" onClick={draft} loading={busy}>{fields ? '重新生成草稿' : '生成草稿'}</Button></Form.Item></Col>
+          </Row>
+        </Form>
+        {notes.length > 0 && <Alert type="warning" showIcon message={<ul style={{ margin: 0, paddingLeft: 18 }}>{notes.map((n) => <li key={n}>{n}</li>)}</ul>} />}
       </Card>
 
       {fields && (
         <>
-          <Card size="small" title="2. 字段 · 把 <TODO: …> 都换成实际内容" style={{ marginBottom: 12 }}>
+          <Card size="small" title="字段" extra={<span style={{ color: '#999', fontSize: 12 }}>把 &lt;TODO: …&gt; 都换成实际内容</span>} style={{ marginBottom: 12 }}>
             <JsonForm catalog={catalog} value={fields} onChange={setFields} hide={['number', 'state', 'approval', 'close_code', 'sys_updated_on']} />
           </Card>
-          <Card size="small" title="3. Tasks" style={{ marginBottom: 12 }} extra={<Button size="small" onClick={() => setTasks([...tasks, {}])}>加一行</Button>}>
-            <Table rowKey={(_, i) => i} size="small" pagination={false} columns={taskColumns} dataSource={tasks} />
+          <Card size="small" title="Tasks" style={{ marginBottom: 12 }} extra={<Button size="small" onClick={() => setTasks([...tasks, {}])}>加一行</Button>}>
+            <Table rowKey={(_, i) => i} size="small" pagination={false} columns={taskColumns} dataSource={tasks} locale={{ emptyText: '没有 task' }} />
           </Card>
-          <Card size="small" title="4. 校验与创建">
-            <Space>
+          <Card size="small" title="校验与创建">
+            <Space wrap>
               <Button onClick={validate} loading={busy}>校验</Button>
-              <Button type="primary" onClick={create} loading={busy} disabled={result && !result.passed}>创建到 ServiceNow</Button>
-              <span style={{ color: '#888' }}>创建后提交审批仍由你完成;error 没清零后端也会拦。</span>
+              <Button type="primary" onClick={create} loading={busy} disabled={!result || !result.passed}>创建到 ServiceNow</Button>
+              <span style={{ color: '#888', fontSize: 12 }}>先校验,硬规则通过了才能创建;创建后提交审批仍由你完成。</span>
             </Space>
             {result && (
               <div style={{ marginTop: 12 }}>
