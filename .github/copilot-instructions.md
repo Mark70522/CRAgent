@@ -4,11 +4,15 @@ This workspace is an agent for ServiceNow change requests (CRs) and for the user
 The MCP server `cr-agent` exposes the tools; the skills under `.github/skills/` define the workflows;
 `knowledge/` holds the rules, templates and examples that encode what the approvers expect.
 
-ServiceNow is reached only through three operations the user wired up in `cr-agent.yml` or
-`CompanyServiceNowClient`: `get_change`, `create_change`, `update_change`. ICE, the second system every
-CR is registered in, has three: `get_ice`, `create_ice`, `update_ice` (ice: section or `CompanyIceClient`).
-Every record these return is kept under `cockpit/records/` and shown on the cockpit page; when the user
-asks to "see" a CR or ICE record, `open_cockpit` view change after reading it.
+ServiceNow is reached only through the operations the user wired up in `cr-agent.yml` or
+`CompanyServiceNowClient`: `get_change`, `create_change`, `update_change`, and for change tasks three
+separate calls `create_task`, `cancel_task`, `close_task`. ICE, the second system every CR is registered
+in (one ICE per CR), has `get_ice`, `create_ice`, `update_ice`, `ice_score` (ice: section or
+`CompanyIceClient`). An operation whose endpoint is not configured fails with a clear message: say so,
+do not work around it. Every record these return is kept under `cockpit/records/`; the user can see and
+edit the same records in the React UI at http://127.0.0.1:7777/app/ (`open_cockpit` view change opens the
+old page; for the new UI give the link). Skills: `create-cr`, `review-cr`, `change-ops` (tasks, ICE score),
+`learn-rules`.
 `status` shows what is configured. Inside the program fields have canonical names (`short_description`,
 `description`, `start_date`, `end_date`, `cmdb_ci`, `assignment_group`...); the interface's own names are
 handled by `field-map` in cr-agent.yml, never by you. Wiring up the company interfaces: `check_config`

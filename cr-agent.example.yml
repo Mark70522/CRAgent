@@ -40,6 +40,20 @@ servicenow:
       path: /change/${number}
       # body: '{"request": ${fields}}'
       result: data
+    # ---- change task 三个接口, 各自独立调用(可选, 不配就是关着的)
+    create-task:                 # 参数: number(CR 号), fields(task 字段对象), 以及每个字段单独的 ${字段名}
+      method: POST
+      path: /change/${number}/task
+      result: data
+    cancel-task:                 # 参数: id(task id), fields(比如 reason), 以及每个字段单独的 ${字段名}
+      method: POST
+      path: /task/${id}/cancel
+      result: data
+    close-task:                  # 参数: id, fields(比如 close_notes)
+      method: POST
+      path: /task/${id}/close
+      result: data
+  task-id-field: sys_id          # task 返回里哪个键是 task id(默认 sys_id, 找不到再试 number、id)
 
   # ---- 字段名对照(可选): 左边是程序内部的标准名(模板、规则、范例、页面都用它), 右边是你们接口的名字。
   #      只在接口边界改名, 发出去改成右边, 收回来改回左边。接口字段名和标准名一样就不用写。
@@ -75,6 +89,11 @@ servicenow:
 #       method: PUT
 #       path: /ice/${id}
 #       result: data
+#     ice-score:                 # 参数: id。查分数(可选)
+#       method: GET
+#       path: /ice/${id}/score
+#       result: data
+#   score-field: score           # 分数在返回记录里的键(默认 score)
 #   # field-map:                 # 同 servicenow.field-map, ICE 自己的一套
 #   #   title: subject
 #   # ICE 字段怎么从 CR 来: 左边 ICE 字段, 右边用 CR 的标准字段名拼。draft_ice 按这个算好给你确认, 每次一样。

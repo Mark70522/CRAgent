@@ -125,6 +125,8 @@ yaml 模式的规则:
 | `看一下 CHG0012345` | `get_change` 读出来并跑规则,页面「变更单」视图能看全文和接口原始返回 |
 | `用 create-cr skill,给 Order Portal 的 prod 打十月补丁,周日 1 点` | 查清单 → 看范例 → 套模板 → 填描述 → 校验 → 给你确认 → 调 create-change |
 | `审一下 CHG0012345` | 逐条规则给出问题和改法;你说"改"它才调 update-change |
+| `给 CHG… 加个 task 做回归验证` / `取消第 3 个 task` / `关掉 pre-check` | change-ops 技能:三个 task 接口各自独立调用,每次确认一次 |
+| `这张单的 ICE 分数` / `ICE 窗口改成周日 2 点` | `ice_score` / `update_ice` 后再查分数,分数历史留在本地 |
 | `被打回了,理由是 …` | 存档、提炼规则问你要不要加 |
 | `早` | 一个字就够:Copilot 自动拉起 cr-agent,把驾驶舱页面弹到浏览器,读昨天和在等的,给你今天三件事 |
 | `早安` / `记成任务` / `记一笔` / `收工` | 驾驶舱的早晚流程,见 `.github/skills/` |
@@ -148,7 +150,7 @@ yaml 模式的规则:
 
 | 只读,可以自动批准 | 会写东西,保留确认 |
 |---|---|
-| `status` `check_config` `probe`(send=false)`draft_ice` `remember`(只写当天随手记,晚上还要确认)`get_change` `lookup_ci` `lookup_service` `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` `read_rules` `list_examples` `read_example` `eval_rules` `get_ice` `get_day` `list_tasks` `task_notes` `task_history` `search_knowledge` `read_knowledge` `cockpit_url` `open_cockpit` | `create_change` `update_change` `create_ice` `update_ice`(代码里还要 confirmed=true)· `probe`(send=true)`save_fixture` · `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` · `add_tasks` `update_task` `plan_day` `capture_note` `close_day` `save_knowledge` |
+| `status` `check_config` `probe`(send=false)`draft_ice` `ice_score` `remember`(只写当天随手记,晚上还要确认)`get_change` `lookup_ci` `lookup_service` `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` `read_rules` `list_examples` `read_example` `eval_rules` `get_ice` `get_day` `list_tasks` `task_notes` `task_history` `search_knowledge` `read_knowledge` `cockpit_url` `open_cockpit` | `create_change` `update_change` `create_task` `cancel_task` `close_task` `create_ice` `update_ice`(代码里还要 confirmed=true)· `probe`(send=true)`save_fixture` · `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` · `add_tasks` `update_task` `plan_day` `capture_note` `close_day` `save_knowledge` |
 
 **工具按需加载(省 token)**:Agent 模式每一轮都把全部工具定义发给模型,40 个工具约五六千 token。`cr-agent.yml` 里加
 

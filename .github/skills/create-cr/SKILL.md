@@ -56,13 +56,21 @@ Report what the endpoint returned (the number if it is in the response). Remind 
 submitting for approval is still done by them; once submitted they can say "T-xxxx 等审批" and the
 task moves to waiting.
 
+**Tasks.** If `create_change` returned the CR without its tasks (the interface creates tasks separately:
+`status` / `check_config` show `create-task` configured and the create-change body has no `${tasks}`),
+create them now one by one with `create_task`, in `order`, each confirmed once as a batch by the user
+("建这 4 个 task?"). Report every task id. If `create-task` is not configured, say the tasks still have to
+be added by hand and list them.
+
 **ICE.** Every CR also has to be registered in ICE. If `status` shows ICE configured: right after the CR
 is created, `draft_ice` with the new number - it derives the ICE fields from the CR by the rules in
 cr-agent.yml (`ice.from-change`), the same way every time. Show the fields, fill any `emptyFields` from
 the user's words, apply corrections, and on the user's word `create_ice` with `confirmed=true`, the CR
 number and the same `taskId`. The task then shows both numbers. If `draft_ice` returns a `hint`
 (from-change not configured), compose the fields by hand and say which CR fields you used. If ICE is
-not configured at all, say once that the ICE step is still manual.
+not configured at all, say once that the ICE step is still manual. When `ice-score` is configured,
+`ice_score` right after creating and tell the user the score; a low score is a reason to review the ICE
+fields before the CR is submitted.
 
 ## 7. Learn
 

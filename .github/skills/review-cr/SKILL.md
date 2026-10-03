@@ -30,7 +30,9 @@ Show exactly which fields will change and the new text; after the user agrees, `
 
 If the change touched anything ICE also carries (title, window, scope, owner) and the task has an `ice`
 id (`get_change` returns the linked task), propose the matching `update_ice` and send it only after the
-user agrees. A CR with no ICE id yet: offer `create_ice` (see create-cr).
+user agrees, then `ice_score` and report the new score. A CR with no ICE id yet: offer `create_ice`
+(see create-cr). Task-level fixes (a task to drop, a missing step) go through the change-ops skill:
+`cancel_task` / `create_task`, each confirmed.
 
 ## 5. Learn from a rejection
 

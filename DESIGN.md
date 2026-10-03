@@ -82,8 +82,9 @@ create-change 的 body:不写模板 = 草稿字段平铺;写模板可用 `${fiel
 |---|---|
 | 状态 | `status`(接口、配置体检、清单、规则、范例、回归、页面、审计一次看全) |
 | 接入 | `check_config`(yml 体检)`probe`(渲染 / 真发一个端点,看完整返回)`save_fixture`(真实返回存成回放样本,`FixtureReplayTest` 验证 yml) |
-| ServiceNow | `get_change` `create_change` `update_change`(建和改都要 confirmed=true) |
-| ICE | `draft_ice`(按 `ice.from-change` 从 CR 算出 ICE 字段)`get_ice` `create_ice` `update_ice`(建改要 confirmed=true;`ice:` 段没配就拒绝) |
+| ServiceNow | `get_change` `create_change` `update_change`(建和改都要 confirmed=true)· task 三个独立接口 `create_task` `cancel_task` `close_task` |
+| ICE | `draft_ice`(按 `ice.from-change` 从 CR 算出 ICE 字段)`get_ice` `create_ice` `update_ice` `ice_score`(建改要 confirmed=true;`ice:` 段没配就拒绝) |
+| React UI | `/api/v1`(`{code,message,data}`)+ `/app/`:变更单、task、ICE、分数、台账、字段目录(`knowledge/forms/*.json`,FormCatalog) |
 | 清单 | `lookup_ci` `lookup_service` |
 | 模板 / 校验 | `list_templates` `get_template` `build_draft` `validate_draft` `validate_change` |
 | 规则与范例 | `read_rules` `add_hard_rule` `add_soft_rule` `save_example` `save_rejected` `list_examples` `read_example` `eval_rules` |
