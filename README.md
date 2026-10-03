@@ -17,7 +17,7 @@ ServiceNow 的接口**完全由你在配置里描述**,程序不预设任何表�
 mvn -q -DskipTests package        # 产出 target/cr-agent.jar
 ```
 
-**只用页面**:双击 `start.bat`,浏览器自动打开 http://127.0.0.1:7777/app/ 。关窗口就停。(`run.bat` 是给 Copilot 的,不弹浏览器。)
+**一键启动**:双击 `start.bat`。没有 jar 就先编译(找 PATH 上的 mvn 或 IntelliJ 自带的),后台起后端,等它应答,再自动打开 http://127.0.0.1:7777/app/ ;已经在跑就只开页面。`stop.bat` 停掉。(`run.bat` 是给 Copilot 的,不弹浏览器;`dev.bat` 是改前端用的,起后端加 Vite 热更新,要 Node。)
 
 **页面开机自启,不依赖 IntelliJ**:`cockpit-autostart.bat install` 一次,以后登录 Windows 就有页面(后台 javaw,无窗口,日志 `logs/cockpit.log`);`remove` 取消,`start` / `stop` 手动起停。Copilot 之后拉起自己的 cr-agent 时发现端口被占只记一条 warn,工具照常用,两个进程读写的是同一批文件。
 
