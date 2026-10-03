@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, Collapse, Input, Modal, Popconfirm, Space, Table, Tag, Typography, App } from 'antd'
-import JsonForm from '../../components/JsonForm'
+import FieldsEditor from '../../components/FieldsEditor'
 import { changeApi, formsApi } from './changeApi'
 
 /**
@@ -70,7 +70,7 @@ export default function TaskPanel({ number, recordTasks = [] }) {
         locale={{ emptyText: '这里还没有建过、取消过或关闭过的 task' }} />
 
       <Modal title={`给 ${number} 加一个 task`} open={adding} onOk={add} okText="创建到 ServiceNow" confirmLoading={busy} onCancel={() => setAdding(false)} width={820}>
-        <JsonForm catalog={catalog} value={draft} onChange={setDraft} hide={['sys_id', 'number', 'state', 'close_notes']} />
+        <FieldsEditor catalog={catalog} value={draft} onChange={setDraft} hide={['sys_id', 'number', 'state', 'close_notes']} />
       </Modal>
     </div>
   )

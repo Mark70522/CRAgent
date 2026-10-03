@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Card, Col, Form, Input, Row, Select, Space, Steps, Table, Tag, Typography, App } from 'antd'
+import { Alert, Button, Card, Col, Form, Input, Row, Segmented, Select, Space, Steps, Table, Tag, Typography, App } from 'antd'
+import JsonEditor from '../../components/JsonEditor'
 import { useNavigate } from 'react-router-dom'
-import JsonForm from '../../components/JsonForm'
+import FieldsEditor from '../../components/FieldsEditor'
 import { changeApi, formsApi } from './changeApi'
 
 /** Template -> draft -> edit fields and tasks -> validate -> create. Same gate as Copilot: hard-rule errors block creation. */
@@ -17,6 +18,7 @@ export default function ChangeNewPage() {
   const [tasks, setTasks] = useState([])
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [taskMode, setTaskMode] = useState('table')
 
   useEffect(() => {
     changeApi.templates().then((t) => { setTemplates(t); if (t[0]) form.setFieldValue('template', t[0].name) }).catch((e) => message.error(e.message))
@@ -72,10 +74,15 @@ export default function ChangeNewPage() {
       {fields && (
         <>
           <Card size="small" title="字段" extra={<span style={{ color: '#999', fontSize: 12 }}>把 &lt;TODO: …&gt; 都换成实际内容</span>} style={{ marginBottom: 12 }}>
-            <JsonForm catalog={catalog} value={fields} onChange={setFields} hide={['number', 'state', 'approval', 'close_code', 'sys_updated_on']} />
+            <FieldsEditor catalog={catalog} value={fields} onChange={setFields} hide={['number', 'state', 'approval', 'close_code', 'sys_updated_on']} />
           </Card>
-          <Card size="small" title="Tasks" style={{ marginBottom: 12 }} extra={<Button size="small" onClick={() => setTasks([...tasks, {}])}>加一行</Button>}>
-            <Table rowKey={(_, i) => i} size="small" pagination={false} columns={taskColumns} dataSource={tasks} locale={{ emptyText: '没有 task' }} />
+          <Card size="small" title="Tasks" style={{ marginBottom: 12 }} extra={<Space><Segmented size="small" value={taskMode} onChange={setTaskMode} options={[{ value: 'table', label: '表格' }, { value: 'json', label: 'JSON' }]} />{taskMode === 'table' && <Button size="small" onClick={() => setTasks([...tasks, {}])}>加一行</Button>}</Space>}>
+            {taskMode === 'table'
+              ? <Table rowKey={(_, i) => i} size="small" pagination={false} columns={taskColumns} dataSource={tasks} locale={{ emptyText: '没有 task' }} />
+              : <JsonEditor value={tasks} onChange={(v) => Array.isArray(v) && setTasks(v)} rows={12} />}
+          </Card>
+          <Card size="small" title="发出去的请求体" style={{ marginBottom: 12 }} extra={<span style={{ color: '#999', fontSize: 12 }}>create-change 收到的就是这个,按 cr-agent.yml 的 body 模板和 field-map 渲染</span>}>
+            <JsonEditor value={{ fields, tasks }} onChange={(v) => { if (v && typeof v === 'object') { if (v.fields) setFields(v.fields); if (Array.isArray(v.tasks)) setTasks(v.tasks) } }} rows={14} />
           </Card>
           <Card size="small" title="校验与创建">
             <Space wrap>

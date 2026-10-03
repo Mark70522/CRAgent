@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Alert, Button, Card, Space, Tag, Typography, App } from 'antd'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import JsonForm, { diffFields } from '../../components/JsonForm'
+import { diffFields } from '../../components/JsonForm'
+import FieldsEditor from '../../components/FieldsEditor'
 import JsonPanel from '../../components/JsonPanel'
 import TaskPanel from './TaskPanel'
 import { changeApi, formsApi } from './changeApi'
@@ -71,7 +72,7 @@ export default function ChangeDetailPage() {
       {rec && (
         <>
           <Card size="small" style={{ marginBottom: 12 }}>
-            <JsonForm catalog={catalog} value={value} original={rec.fields} onChange={setValue} readonly={!editing} onLearn={learn} hide={['number']} />
+            <FieldsEditor catalog={catalog} value={value} original={rec.fields} onChange={setValue} readonly={!editing} onLearn={learn} hide={['number']} />
           </Card>
           {vios.length > 0 && (
             <Card size="small" title="硬规则校验" style={{ marginBottom: 12 }}>

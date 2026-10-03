@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Alert, Button, Card, Space, Statistic, Tag, Typography, App } from 'antd'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import JsonForm, { diffFields } from '../../components/JsonForm'
+import { diffFields } from '../../components/JsonForm'
+import FieldsEditor from '../../components/FieldsEditor'
 import JsonPanel from '../../components/JsonPanel'
 import { iceApi } from './iceApi'
 import { formsApi } from '../change/changeApi'
@@ -78,7 +79,7 @@ export default function IceDetailPage() {
             </Card>
           )}
           <Card size="small" style={{ marginBottom: 12 }}>
-            <JsonForm catalog={catalog} value={value} original={rec.fields} onChange={setValue} readonly={!editing} onLearn={learn} hide={['id']} />
+            <FieldsEditor catalog={catalog} value={value} original={rec.fields} onChange={setValue} readonly={!editing} onLearn={learn} hide={['id']} />
           </Card>
           <JsonPanel fields={rec.fields} raw={rec.raw} />
         </>
