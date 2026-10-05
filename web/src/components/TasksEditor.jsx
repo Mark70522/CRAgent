@@ -1,20 +1,14 @@
 import { useRef, useState } from 'react'
 import { Button, Segmented, Space, Table, Tooltip, App } from 'antd'
 import { DeleteOutlined, FieldTimeOutlined, HolderOutlined, PlusOutlined } from '@ant-design/icons'
-import dayjs from 'dayjs'
 import FieldControl from './FieldControl'
 import JsonEditor from './JsonEditor'
 import { guessType } from './fieldTypes'
 
-const FMT = 'YYYY-MM-DD HH:mm:ss'
+import { moveRow, reflowTimes, renumber } from './tasksLogic'
+
 // textarea has no width: the description column takes what is left.
 const WIDTH = { text: 150, json: 280, table: 360, object: 280, datetime: 178, date: 140, time: 110, boolean: 70, number: 100, reference: 240, list: 200, select: 150, multiselect: 200, email: 180, url: 180 }
-
-/** order = 10, 20, 30 … in the current row order; text if the rows had text orders (templates do), else numbers. */
-export function renumber(tasks) {
-  const asText = tasks.some((t) => typeof t.order === 'string')
-  return tasks.map((t, i) => ({ ...t, order: asText ? String((i + 1) * 10) : (i + 1) * 10 }))
-}
 
 /**
  * The tasks of a change as a table driven by the task catalog (knowledge/forms/task.json): time pickers,
@@ -38,20 +32,13 @@ export default function TasksEditor({ catalog = [], value = [], onChange }) {
 
   const write = (list) => onChange(renumber(list))
   const setCell = (i, k, x) => onChange(value.map((t, j) => (j === i ? { ...t, [k]: x } : t)))
-  const move = (a, b) => { if (a == null || b == null || a === b) return; const n = [...value]; const [x] = n.splice(a, 1); n.splice(b, 0, x); write(n) }
+  const move = (a, b) => { const n = moveRow(value, a, b); if (n !== value) onChange(n) }
   const reset = () => { from.current = null; setArmed(null); setOver(null) }
 
   function reflow() {
-    const first = value.map((t) => dayjs(t[startKey], FMT)).find((d) => d.isValid())
-    if (!first) { message.warning('先给第一个 task 选开始时间'); return }
-    let cursor = first
-    onChange(value.map((t) => {
-      const s = dayjs(t[startKey], FMT), e = dayjs(t[endKey], FMT)
-      const minutes = s.isValid() && e.isValid() && e.isAfter(s) ? e.diff(s, 'minute') : 30
-      const next = { ...t, [startKey]: cursor.format(FMT), [endKey]: cursor.add(minutes, 'minute').format(FMT) }
-      cursor = cursor.add(minutes, 'minute')
-      return next
-    }))
+    const next = reflowTimes(value, startKey, endKey)
+    if (!next) { message.warning('先给第一个 task 选开始时间'); return }
+    onChange(next)
   }
 
   const columns = [
