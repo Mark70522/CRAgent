@@ -115,8 +115,7 @@ public class ExampleStore {
         o.setAllowUnicode(true);
         o.setWidth(120);
         try {
-            Files.createDirectories(f.getParent());
-            Files.writeString(f, new Yaml(o).dump(doc), StandardCharsets.UTF_8);
+            com.company.cragent.util.DirLock.writeAtomically(f, new Yaml(o).dump(doc));
         } catch (IOException e) { throw new IllegalStateException("Cannot write " + f, e); }
     }
 

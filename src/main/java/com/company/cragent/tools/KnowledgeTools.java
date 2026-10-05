@@ -135,8 +135,11 @@ public class KnowledgeTools {
         append(props.rulesDir().resolve("changelog.md"), "- " + LocalDate.now() + " | " + kind + " | " + id + " | " + nz(summary) + " | " + nz(reason) + "\n");
     }
     private static void append(Path file, String text) {
-        try { Files.createDirectories(file.getParent()); Files.writeString(file, text, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND); }
-        catch (IOException e) { throw new IllegalStateException("Cannot write " + file, e); }
+        // under the directory lock: Copilot's process and the page's process may both add rules
+        com.company.cragent.util.DirLock.run(file.getParent(), () -> {
+            try { Files.writeString(file, text, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND); }
+            catch (IOException e) { throw new IllegalStateException("Cannot write " + file, e); }
+        });
     }
     private static String readOrEmpty(Path p) {
         try { return Files.exists(p) ? Files.readString(p, StandardCharsets.UTF_8) : ""; }

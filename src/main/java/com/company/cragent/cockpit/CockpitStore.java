@@ -1,5 +1,7 @@
 package com.company.cragent.cockpit;
 
+
+import com.company.cragent.util.DirLock;
 import com.company.cragent.cockpit.CockpitModel.*;
 import com.company.cragent.config.CockpitProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -46,13 +48,13 @@ public class CockpitStore {
 
     // ------------------------------------------------------------------ tasks
 
-    public synchronized List<Task> tasks() {
+    public synchronized List<Task> tasks() { return DirLock.with(props.dir(), () -> {
         return read(props.backlog(), new TypeReference<List<Task>>() {}, new ArrayList<>());
-    }
+    }); }
 
-    public synchronized Optional<Task> task(String id) {
+    public synchronized Optional<Task> task(String id) { return DirLock.with(props.dir(), () -> {
         return tasks().stream().filter(t -> t.id.equalsIgnoreCase(id)).findFirst();
-    }
+    }); }
 
     /**
      * Result of add: which were created, which merged into an existing task, and for each created task the
@@ -60,7 +62,7 @@ public class CockpitStore {
      */
     public record AddResult(List<Task> created, List<Task> merged, List<Related> related) {}
 
-    public synchronized AddResult addTasks(List<Task> incoming, String source) {
+    public synchronized AddResult addTasks(List<Task> incoming, String source) { return DirLock.with(props.dir(), () -> {
         List<Task> all = tasks();
         List<Task> created = new ArrayList<>(), merged = new ArrayList<>();
         List<Related> related = new ArrayList<>();
@@ -102,10 +104,10 @@ public class CockpitStore {
         }
         write(props.backlog(), all);
         return new AddResult(created, merged, related);
-    }
+    }); }
 
     /** Finished tasks that look like this one, newest first, with the pitfall / learned lines from their notes. */
-    public synchronized List<Related> relatedPast(Task t, List<Task> all) {
+    public synchronized List<Related> relatedPast(Task t, List<Task> all) { return DirLock.with(props.dir(), () -> {
         return all.stream()
                 .filter(p -> !p.id.equals(t.id) && !p.isOpen() && similar(p.title, t.title))
                 .sorted(Comparator.comparing((Task p) -> p.doneAt == null ? p.updatedAt == null ? "" : p.updatedAt : p.doneAt).reversed())
@@ -121,16 +123,16 @@ public class CockpitStore {
                     return r;
                 })
                 .collect(Collectors.toList());
-    }
+    }); }
 
     /** Tie a task to the change request that was created for it. Idempotent; records the link in the task's notes. */
-    public synchronized Task linkChange(String taskId, String number) {
+    public synchronized Task linkChange(String taskId, String number) { return DirLock.with(props.dir(), () -> {
         Task t = updateTask(taskId, Map.of("cr", number), "变更单 " + number + " 已创建");
         return t;
-    }
+    }); }
 
     /** What to watch besides the plan: waiting tasks, runs coming up within a week, runs already past, deadlines within 3 days, open CRs. */
-    public synchronized Attention attention(String date) {
+    public synchronized Attention attention(String date) { return DirLock.with(props.dir(), () -> {
         String d = date == null || date.isBlank() ? today() : date;
         String weekLater = LocalDate.parse(d).plusDays(7).toString();
         String soon = LocalDate.parse(d).plusDays(3).toString();
@@ -150,9 +152,9 @@ public class CockpitStore {
         a.overdueRun.sort(Comparator.comparing(t -> t.scheduledAt));
         a.dueSoon.sort(Comparator.comparing(t -> t.due));
         return a;
-    }
+    }); }
 
-    public synchronized Task updateTask(String id, Map<String, String> fields, String note) {
+    public synchronized Task updateTask(String id, Map<String, String> fields, String note) { return DirLock.with(props.dir(), () -> {
         List<Task> all = tasks();
         Task t = all.stream().filter(x -> x.id.equalsIgnoreCase(id)).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("No task " + id));
@@ -185,43 +187,43 @@ public class CockpitStore {
         write(props.backlog(), all);
         if (note != null && !note.isBlank()) appendTaskNote(t.id, now() + " " + note.trim());
         return t;
-    }
+    }); }
 
-    public synchronized void appendTaskNote(String id, String line) {
+    public synchronized void appendTaskNote(String id, String line) { DirLock.run(props.dir(), () -> {
         Path f = props.notes().resolve(id + ".md");
         String head = Files.exists(f) ? "" : "# " + id + " " + task(id).map(t -> t.title).orElse("") + "\n\n";
         append(f, head + "- " + line.replace("\n", "\n  ") + "\n");
-    }
+    }); }
 
-    public synchronized String taskNotes(String id) {
+    public synchronized String taskNotes(String id) { return DirLock.with(props.dir(), () -> {
         Path f = props.notes().resolve(id + ".md");
         return Files.exists(f) ? readString(f) : "";
-    }
+    }); }
 
     // ------------------------------------------------------------------ days
 
-    public synchronized Day day(String date) {
+    public synchronized Day day(String date) { return DirLock.with(props.dir(), () -> {
         String d = date == null || date.isBlank() ? today() : date;
         Day day = read(props.days().resolve(d + ".json"), new TypeReference<Day>() {}, null);
         if (day == null) { day = new Day(); day.date = d; }
         return day;
-    }
+    }); }
 
-    public synchronized void saveDay(Day day) {
+    public synchronized void saveDay(Day day) { DirLock.run(props.dir(), () -> {
         write(props.days().resolve(day.date + ".json"), day);
-    }
+    }); }
 
     /** Tasks planned on an earlier day and still not done: they follow you until you finish or drop them. */
-    public synchronized List<Task> carryOver(String date) {
+    public synchronized List<Task> carryOver(String date) { return DirLock.with(props.dir(), () -> {
         String d = date == null ? today() : date;
         return tasks().stream()
                 .filter(Task::isActionable)
                 .filter(t -> t.plannedFor != null && t.plannedFor.compareTo(d) < 0)
                 .sorted(Comparator.comparing((Task t) -> t.priority).thenComparing(t -> t.plannedFor))
                 .collect(Collectors.toList());
-    }
+    }); }
 
-    public synchronized Day planDay(String date, List<String> ids, String brief, List<Slot> timeline) {
+    public synchronized Day planDay(String date, List<String> ids, String brief, List<Slot> timeline) { return DirLock.with(props.dir(), () -> {
         Day day = day(date);
         List<Task> all = tasks();
         for (String id : ids) {
@@ -237,9 +239,9 @@ public class CockpitStore {
         if (timeline != null) day.timeline = timeline;
         saveDay(day);
         return day;
-    }
+    }); }
 
-    public synchronized Note capture(String date, String text, String kind, String taskId) {
+    public synchronized Note capture(String date, String text, String kind, String taskId) { return DirLock.with(props.dir(), () -> {
         Day day = day(date);
         Note n = new Note();
         n.t = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
@@ -250,7 +252,7 @@ public class CockpitStore {
         saveDay(day);
         if (taskId != null && !taskId.isBlank()) appendTaskNote(taskId, n.t + " " + (n.kind == null ? "" : "[" + n.kind + "] ") + n.text);
         return n;
-    }
+    }); }
 
     /** Result of remember: stored, or why not. */
     public record Remembered(String status, Note note, String duplicateOf) {}
@@ -260,7 +262,7 @@ public class CockpitStore {
      * evening close shows it for confirmation like any other note. Skipped when the same thing is already
      * in today's notes or in the knowledge files, so repeated conversations do not pile up copies.
      */
-    public synchronized Remembered remember(String text, String kind, String source, String taskId) {
+    public synchronized Remembered remember(String text, String kind, String source, String taskId) { return DirLock.with(props.dir(), () -> {
         String clean = stripKindPrefix(text == null ? "" : text.trim());
         if (clean.isBlank()) return new Remembered("empty", null, null);
         Day today = day(null);
@@ -282,11 +284,11 @@ public class CockpitStore {
         saveDay(today);
         if (n.taskId != null) appendTaskNote(n.taskId, n.t + " [" + n.kind + ", auto] " + n.text);
         return new Remembered("stored", n, null);
-    }
+    }); }
 
     private static String firstLine(String s) { int i = s.indexOf('\n'); return i < 0 ? s : s.substring(0, i); }
 
-    public synchronized Day closeDay(String date, String summary, List<String> tomorrow) {
+    public synchronized Day closeDay(String date, String summary, List<String> tomorrow) { return DirLock.with(props.dir(), () -> {
         Day day = day(date);
         day.summary = summary;
         if (tomorrow != null) day.tomorrow = tomorrow;
@@ -310,22 +312,22 @@ public class CockpitStore {
         stats.days.sort(Comparator.comparing(x -> x.date));
         write(props.stats(), stats);
         return day;
-    }
+    }); }
 
-    public synchronized Stats stats() { return read(props.stats(), new TypeReference<Stats>() {}, new Stats()); }
+    public synchronized Stats stats() { return DirLock.with(props.dir(), () -> { return read(props.stats(), new TypeReference<Stats>() {}, new Stats()); }); }
 
-    public synchronized List<String> recentDays(int n) {
+    public synchronized List<String> recentDays(int n) { return DirLock.with(props.dir(), () -> {
         if (!Files.isDirectory(props.days())) return List.of();
         try (Stream<Path> s = Files.list(props.days())) {
             return s.map(p -> p.getFileName().toString()).filter(f -> f.endsWith(".json"))
                     .map(f -> f.substring(0, f.length() - 5)).sorted(Comparator.reverseOrder()).limit(n).collect(Collectors.toList());
         } catch (IOException e) { throw new IllegalStateException(e); }
-    }
+    }); }
 
     // ------------------------------------------------------------------ knowledge
 
     /** The file for a topic: an existing file whose first line is "# topic" (whatever it is named), else a new ASCII-named one. */
-    public synchronized Path topicFile(String topic) {
+    public synchronized Path topicFile(String topic) { return DirLock.with(props.dir(), () -> {
         String want = topic.trim().toLowerCase();
         if (Files.isDirectory(props.knowledge())) {
             try (Stream<Path> s = Files.list(props.knowledge())) {
@@ -336,9 +338,9 @@ public class CockpitStore {
             } catch (IOException e) { throw new IllegalStateException(e); }
         }
         return props.knowledge().resolve(slug(topic) + ".md");
-    }
+    }); }
 
-    public synchronized Path saveKnowledge(String topic, String title, String content, String sourceDate, String taskId) {
+    public synchronized Path saveKnowledge(String topic, String title, String content, String sourceDate, String taskId) { return DirLock.with(props.dir(), () -> {
         Path f = topicFile(topic);
         String head = Files.exists(f) ? "" : "# " + topic.trim() + "\n";
         StringBuilder sb = new StringBuilder(head);
@@ -347,14 +349,14 @@ public class CockpitStore {
         if (taskId != null && !taskId.isBlank()) sb.append("\n来源:任务 ").append(taskId).append(" · ").append(sourceDate == null ? today() : sourceDate).append("\n");
         append(f, sb.toString());
         return f;
-    }
+    }); }
 
-    public synchronized void markNoteSaved(String date, int noteIndex) {
+    public synchronized void markNoteSaved(String date, int noteIndex) { DirLock.run(props.dir(), () -> {
         Day day = day(date);
         if (noteIndex >= 0 && noteIndex < day.notes.size()) { day.notes.get(noteIndex).saved = true; saveDay(day); }
-    }
+    }); }
 
-    public synchronized List<KnowledgeCard> knowledgeCards() {
+    public synchronized List<KnowledgeCard> knowledgeCards() { return DirLock.with(props.dir(), () -> {
         List<KnowledgeCard> out = new ArrayList<>();
         if (!Files.isDirectory(props.knowledge())) return out;
         try (Stream<Path> s = Files.list(props.knowledge())) {
@@ -373,9 +375,9 @@ public class CockpitStore {
             }
         } catch (IOException e) { throw new IllegalStateException(e); }
         return out;
-    }
+    }); }
 
-    public synchronized String readKnowledge(String topic) {
+    public synchronized String readKnowledge(String topic) { return DirLock.with(props.dir(), () -> {
         Path f = topicFile(topic);
         if (Files.exists(f)) return readString(f);
         // tolerate a partial topic name ("Oracle RU" for "Oracle RU 补丁流程")
@@ -384,10 +386,10 @@ public class CockpitStore {
             if (c.topic.toLowerCase().contains(q)) return readString(props.dir().resolve(c.file));
         }
         return "";
-    }
+    }); }
 
     /** Case-insensitive substring search over knowledge files, task notes and the day logs; returns file + matching lines. */
-    public synchronized List<Map<String, String>> search(String query, int limit) {
+    public synchronized List<Map<String, String>> search(String query, int limit) { return DirLock.with(props.dir(), () -> {
         String q = query.toLowerCase();
         List<Map<String, String>> hits = new ArrayList<>();
         // day logs: notes, brief and summary
@@ -416,12 +418,12 @@ public class CockpitStore {
             } catch (IOException e) { throw new IllegalStateException(e); }
         }
         return hits;
-    }
+    }); }
 
     // ------------------------------------------------------------------ history
 
     /** All "## title (date)" sections across the knowledge files, with the task they came from when recorded. */
-    public synchronized List<KnowledgeEntry> knowledgeEntries() {
+    public synchronized List<KnowledgeEntry> knowledgeEntries() { return DirLock.with(props.dir(), () -> {
         List<KnowledgeEntry> out = new ArrayList<>();
         if (!Files.isDirectory(props.knowledge())) return out;
         try (Stream<Path> s = Files.list(props.knowledge())) {
@@ -456,7 +458,7 @@ public class CockpitStore {
             }
         } catch (IOException e) { throw new IllegalStateException(e); }
         return out;
-    }
+    }); }
 
     /**
      * Task history: every task (any status) with what was recorded about it, filtered by keyword,
@@ -464,7 +466,7 @@ public class CockpitStore {
      * The keyword is matched against title, context, tags, id, the task's notes, linked day notes
      * and the knowledge entries that came out of it.
      */
-    public synchronized List<TaskHistory> history(String query, String status, String from, String to, String sort, int limit) {
+    public synchronized List<TaskHistory> history(String query, String status, String from, String to, String sort, int limit) { return DirLock.with(props.dir(), () -> {
         String q = query == null ? "" : query.trim().toLowerCase();
         String st = status == null || status.isBlank() ? "all" : status.trim().toLowerCase();
         String by = sort == null || sort.isBlank() ? "created" : sort.trim().toLowerCase();
@@ -509,7 +511,7 @@ public class CockpitStore {
                         .thenComparing(h -> h.task.id).reversed())
                 .limit(limit)
                 .collect(Collectors.toList());
-    }
+    }); }
 
     private static boolean matches(TaskHistory h, String q) {
         Task t = h.task;
@@ -598,7 +600,7 @@ public class CockpitStore {
         catch (IOException e) { throw new IllegalStateException("Cannot read " + p, e); }
     }
     private void write(Path p, Object value) {
-        try { Files.createDirectories(p.getParent()); Files.write(p, json.writeValueAsBytes(value)); }
+        try { DirLock.writeAtomically(p, json.writeValueAsBytes(value)); }
         catch (IOException e) { throw new IllegalStateException("Cannot write " + p, e); }
     }
     private static void append(Path f, String text) {

@@ -1,5 +1,7 @@
 package com.company.cragent.knowledge;
 
+
+import com.company.cragent.util.DirLock;
 import com.company.cragent.config.KnowledgeProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,7 +34,7 @@ public class FormCatalog {
     }
 
     /** {kind, fields:[{key,label,type,required,section,readonly,options,order,hint}], file} */
-    public synchronized Map<String, Object> get(String kind) {
+    public synchronized Map<String, Object> get(String kind) { return DirLock.with(props.formsDir(), () -> {
         String k = kind(kind);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("kind", k);
@@ -40,9 +42,9 @@ public class FormCatalog {
         out.put("types", TYPES);
         out.put("file", file(k).toString().replace('\\', '/'));
         return out;
-    }
+    }); }
 
-    public synchronized List<Map<String, Object>> fields(String kind) {
+    public synchronized List<Map<String, Object>> fields(String kind) { return DirLock.with(props.formsDir(), () -> {
         Path f = file(kind(kind));
         if (!Files.exists(f)) return new ArrayList<>();
         try {
@@ -54,10 +56,10 @@ public class FormCatalog {
         } catch (IOException e) {
             throw new IllegalStateException("Cannot read " + f + ": " + e.getMessage(), e);
         }
-    }
+    }); }
 
     /** Replace the whole catalog of a kind (the page's "save" after editing). */
-    public synchronized Map<String, Object> save(String kind, List<Map<String, Object>> fields) {
+    public synchronized Map<String, Object> save(String kind, List<Map<String, Object>> fields) { return DirLock.with(props.formsDir(), () -> {
         String k = kind(kind);
         List<Map<String, Object>> clean = new ArrayList<>();
         Set<String> seen = new HashSet<>();
@@ -72,10 +74,10 @@ public class FormCatalog {
         }
         write(k, clean);
         return get(k);
-    }
+    }); }
 
     /** Add keys seen in a record but not in the catalog (type guessed from the value); returns the added keys. */
-    public synchronized List<String> learn(String kind, Map<String, ?> record) {
+    public synchronized List<String> learn(String kind, Map<String, ?> record) { return DirLock.with(props.formsDir(), () -> {
         String k = kind(kind);
         List<Map<String, Object>> fields = fields(k);
         Set<String> known = new HashSet<>();
@@ -94,7 +96,7 @@ public class FormCatalog {
         });
         if (!added.isEmpty()) write(k, fields);
         return added;
-    }
+    }); }
 
     /**
      * Every type the page can edit. Simple: text textarea number boolean select multiselect date datetime time
@@ -143,11 +145,10 @@ public class FormCatalog {
     private void write(String kind, List<Map<String, Object>> fields) {
         Path f = file(kind);
         try {
-            Files.createDirectories(f.getParent());
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("kind", kind);
             m.put("fields", fields);
-            Files.writeString(f, json.writeValueAsString(m), StandardCharsets.UTF_8);
+            DirLock.writeAtomically(f, json.writeValueAsString(m));
         } catch (IOException e) {
             throw new IllegalStateException("Cannot write " + f + ": " + e.getMessage(), e);
         }

@@ -199,11 +199,12 @@ public class HistoryService {
     private Path save(String name, String text) {
         List<Path> files = templateFiles(name);
         Path f = files.get(0);
-        try {
-            Files.createDirectories(f.getParent());
-            Files.writeString(f, text, StandardCharsets.UTF_8);
-            for (Path old : files.subList(1, files.size())) Files.deleteIfExists(old);
-        } catch (IOException e) { throw new IllegalStateException("Cannot write " + f + ": " + e.getMessage(), e); }
+        com.company.cragent.util.DirLock.run(f.getParent(), () -> {
+            try {
+                com.company.cragent.util.DirLock.writeAtomically(f, text);
+                for (Path old : files.subList(1, files.size())) Files.deleteIfExists(old);
+            } catch (IOException e) { throw new IllegalStateException("Cannot write " + f + ": " + e.getMessage(), e); }
+        });
         return f;
     }
 
