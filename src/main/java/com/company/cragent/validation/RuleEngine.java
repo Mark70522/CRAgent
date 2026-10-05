@@ -1,6 +1,7 @@
 package com.company.cragent.validation;
 
 import com.company.cragent.config.KnowledgeProperties;
+import com.company.cragent.model.Values;
 import com.company.cragent.model.Violation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,11 +86,24 @@ public class RuleEngine {
     }
 
     public List<Violation> validate(Collection<HardRule> rules, Map<String, String> fields, List<Map<String, String>> tasks) {
+        return validate(rules, fields, null, tasks);
+    }
+
+    /**
+     * Same checks with the fields as they really are (lists, objects, reference objects), so a rule's field can
+     * be a path into them: {@code cmdb_ci.value}, {@code servers[0]}, {@code steps[*].owner} (every item).
+     */
+    public List<Violation> validateValues(Map<String, Object> fields, List<Map<String, Object>> tasks) {
+        return validate(loadRules(), Values.asText(fields), fields, Values.asTextList(tasks));
+    }
+
+    private List<Violation> validate(Collection<HardRule> rules, Map<String, String> fields, Map<String, Object> raw, List<Map<String, String>> tasks) {
         List<Violation> out = new ArrayList<>();
+        List<Map<String, String>> t = tasks == null ? List.of() : tasks;
         for (HardRule r : rules) {
-            if (r.when() != null && !conditionMatches(r.when(), fields)) continue;
+            if (r.when() != null && !conditionMatches(r.when(), fields, raw)) continue;
             try {
-                check(r, fields, tasks, out);
+                check(r, fields, raw, t, out);
             } catch (RuntimeException e) {
                 out.add(v(r, r.field(), "Rule could not be evaluated: " + e.getMessage()));
             }
@@ -97,35 +111,33 @@ public class RuleEngine {
         return out;
     }
 
-    private void check(HardRule r, Map<String, String> f, List<Map<String, String>> tasks, List<Violation> out) {
-        String val = r.field() == null ? null : f.getOrDefault(r.field(), "");
+    private void check(HardRule r, Map<String, String> f, Map<String, Object> raw, List<Map<String, String>> tasks, List<Violation> out) {
         switch (r.type()) {
-            case "required", "required_if" -> {
-                if (isBlank(val)) out.add(v(r, r.field(), "Field is required"));
-            }
-            case "min_length" -> {
+            case "required", "required_if" -> each(r, f, raw, (field, val) -> { if (isBlank(val)) out.add(v(r, field, "Field is required")); });
+            case "min_length" -> each(r, f, raw, (field, val) -> {
                 if (val == null || val.trim().length() < r.min())
-                    out.add(v(r, r.field(), "Needs at least " + r.min() + " characters, has " + (val == null ? 0 : val.trim().length())));
-            }
-            case "max_length" -> {
-                if (val != null && val.length() > r.max())
-                    out.add(v(r, r.field(), "Exceeds " + r.max() + " characters"));
-            }
-            case "enum" -> {
+                    out.add(v(r, field, "Needs at least " + r.min() + " characters, has " + (val == null ? 0 : val.trim().length())));
+            });
+            case "max_length" -> each(r, f, raw, (field, val) -> {
+                if (val != null && val.length() > r.max()) out.add(v(r, field, "Exceeds " + r.max() + " characters"));
+            });
+            case "enum" -> each(r, f, raw, (field, val) -> {
                 if (!isBlank(val) && r.values().stream().noneMatch(x -> x.equalsIgnoreCase(val)))
-                    out.add(v(r, r.field(), "Value '" + val + "' not in " + r.values()));
-            }
-            case "regex" -> {
+                    out.add(v(r, field, "Value '" + val + "' not in " + r.values()));
+            });
+            case "regex" -> each(r, f, raw, (field, val) -> {
                 if (val == null || !Pattern.compile(r.pattern(), Pattern.DOTALL).matcher(val).matches())
-                    out.add(v(r, r.field(), "Does not match pattern " + r.pattern()));
-            }
-            case "forbidden_words" -> {
-                if (val != null) {
-                    String lower = val.toLowerCase();
-                    for (String w : r.values()) {
-                        if (lower.contains(w.toLowerCase())) out.add(v(r, r.field(), "Contains forbidden text '" + w + "'"));
-                    }
-                }
+                    out.add(v(r, field, "Does not match pattern " + r.pattern()));
+            });
+            case "forbidden_words" -> each(r, f, raw, (field, val) -> {
+                if (val == null) return;
+                String lower = val.toLowerCase();
+                for (String w : r.values()) if (lower.contains(w.toLowerCase())) out.add(v(r, field, "Contains forbidden text '" + w + "'"));
+            });
+            case "min_items", "max_items" -> {
+                int n = FieldPath.count(r.field(), f, raw);
+                if ("min_items".equals(r.type()) && n < r.min()) out.add(v(r, r.field(), "Needs at least " + r.min() + " item(s), has " + n));
+                if ("max_items".equals(r.type()) && n > r.max()) out.add(v(r, r.field(), "At most " + r.max() + " item(s), has " + n));
             }
             case "date_order" -> {
                 LocalDateTime s = parse(f.get("start_date")), e = parse(f.get("end_date"));
@@ -181,10 +193,17 @@ public class RuleEngine {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    static boolean conditionMatches(Map<String, Object> when, Map<String, String> f) {
+    /** Runs a single-value check once per value the rule's field resolves to (one for a plain name, every item for [*]). */
+    private static void each(HardRule r, Map<String, String> f, Map<String, Object> raw, java.util.function.BiConsumer<String, String> check) {
+        if (r.field() == null) { check.accept(null, null); return; }
+        for (Map.Entry<String, String> e : FieldPath.resolve(r.field(), f, raw).entrySet()) check.accept(e.getKey(), e.getValue());
+    }
+
+    static boolean conditionMatches(Map<String, Object> when, Map<String, String> f) { return conditionMatches(when, f, null); }
+
+    static boolean conditionMatches(Map<String, Object> when, Map<String, String> f, Map<String, Object> raw) {
         String field = str(when.get("field"));
-        String actual = f.getOrDefault(field, "");
+        String actual = field == null ? "" : FieldPath.resolve(field, f, raw).values().stream().findFirst().orElse("");
         if (when.containsKey("equals")) return String.valueOf(when.get("equals")).equalsIgnoreCase(actual);
         if (when.containsKey("not_equals")) return !String.valueOf(when.get("not_equals")).equalsIgnoreCase(actual);
         if (when.containsKey("contains")) return actual.toLowerCase().contains(String.valueOf(when.get("contains")).toLowerCase());

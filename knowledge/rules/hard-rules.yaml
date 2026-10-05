@@ -1,8 +1,13 @@
 # Machine-checked rules. Re-read on every validate_* call, so edits take effect immediately.
 #
 # Rule types: required, required_if, min_length, max_length, enum, regex, forbidden_words,
-#             date_order, tasks_min, tasks_within_window, tasks_sequential, tasks_field_required
+#             date_order, tasks_min, tasks_within_window, tasks_sequential, tasks_field_required,
+#             maintenance_window, min_items, max_items (how many items a list field has)
 # Optional "when": {field, equals|not_equals|contains|in|blank} makes a rule conditional.
+# field / when.field can reach inside lists and objects:
+#   cmdb_ci.value      a key of an object (the id of a reference field)
+#   servers[0]         one item of a list
+#   steps[*].owner     every item (the rule is checked once per item)
 # severity: error (blocks create_change) | warn (reported only). Default error.
 #
 # Keep ids stable (HR-001 ...). Record every addition in changelog.md with who asked and why.

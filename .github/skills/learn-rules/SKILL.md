@@ -10,7 +10,10 @@ Rules live in files, not in the model. This skill turns evidence into entries th
 ## A. Record a rule the user states
 
 1. Restate it precisely: which field, which condition, what is required.
-2. Hard (checkable: required, regex, enum, length, dates, task counts, window) or soft (judgement)?
+2. Hard (checkable: required, regex, enum, length, dates, task counts, window, list sizes) or soft (judgement)?
+   For a field that holds a list or object, the rule's `field` can be a path: `cmdb_ci.value` (the id of a
+   reference), `servers[0]`, `steps[*].owner` (every item); `min_items` / `max_items` limit a list's size.
+   Example: "每个步骤都要写负责人" → `type: required, field: "steps[*].owner"`.
 3. `read_rules` to check nothing already covers it; if something does, say which and propose editing it by hand.
 4. After the user confirms: `add_hard_rule` with a YAML snippet, or `add_soft_rule`, with the reason.
 

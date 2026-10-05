@@ -57,7 +57,7 @@ public class ServiceNowTools {
             @ToolParam(description = "Must be true; pass true only after the user explicitly confirmed") boolean confirmed,
             @ToolParam(description = "Cockpit task id (T-0001) this CR belongs to, if any", required = false) String taskId) {
         if (!confirmed) throw new IllegalStateException("Not created: show the draft to the user and ask for confirmation, then call again with confirmed=true.");
-        List<Violation> v = rules.validate(draft.fieldsAsText(), draft.tasksAsText());
+        List<Violation> v = rules.validateValues(draft.fields(), draft.tasks());
         List<Violation> errors = v.stream().filter(x -> "error".equalsIgnoreCase(x.severity())).toList();
         if (!errors.isEmpty()) throw new IllegalStateException("Not created: " + errors.size() + " hard-rule error(s) remain: " + errors);
         ChangeRecord rec = sn.createChange(draft);
@@ -133,7 +133,7 @@ public class ServiceNowTools {
 
     /** Record -> number, fields, tasks, violations, passed, raw. Shared with the web viewer. */
     public Map<String, Object> describe(ChangeRecord rec) {
-        List<Violation> v = rules.validate(rec.fieldsAsText(), rec.tasksAsText());
+        List<Violation> v = rules.validateValues(rec.fields(), rec.tasks());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("number", rec.number());
         out.put("fields", rec.fields());
