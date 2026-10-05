@@ -35,6 +35,17 @@ class CockpitStoreTest {
     }
 
     @Test
+    void attentionListsDeadlinesWithinThreeDays() {
+        CockpitStore s = store();
+        s.addTasks(List.of(t("回复 DBA 邮件", null, null), t("整理补丁清单", null, null), t("季度容量报告", null, null), t("更新值班表", null, null)), "paste");
+        s.updateTask("T-0001", Map.of("due", "2026-10-01"), null);
+        s.updateTask("T-0002", Map.of("due", "2026-10-08"), null);
+        s.updateTask("T-0003", Map.of("due", "2026-10-10"), null);
+        s.updateTask("T-0004", Map.of("due", "2026-10-06", "status", "done"), null);
+        assertThat(s.attention("2026-10-05").dueSoon).extracting(x -> x.id).containsExactly("T-0001", "T-0002");
+    }
+
+    @Test
     void planCaptureAndCloseProduceStatsAndCarryOver() {
         CockpitStore s = store();
         s.addTasks(List.of(t("A", 60, "P1"), t("B", 30, "P2")), "paste");

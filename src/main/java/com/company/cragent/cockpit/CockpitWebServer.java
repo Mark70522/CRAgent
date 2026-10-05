@@ -156,8 +156,9 @@ public class CockpitWebServer {
         } catch (NoSuchElementException e) {
             envelope(ex, 404, e.getMessage(), null);
         } catch (Exception e) {
+            log.warn("{} /api/v1{} failed: {}", method, path, e.toString(), e);
             if (!"GET".equals(method)) audit.record("page", "/api/v1" + path, raw, false, String.valueOf(e.getMessage()), System.currentTimeMillis() - t0);
-            envelope(ex, 500, String.valueOf(e.getMessage()), null);
+            envelope(ex, 500, e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), null);
         }
     }
 
@@ -236,7 +237,12 @@ public class CockpitWebServer {
                 if (p.size() == 2 && id.equals("history") && m.equals("GET")) return store.history(q.get("q"), q.get("status"), q.get("from"), q.get("to"), q.get("sort"), 300);
                 if (p.size() == 2 && m.equals("PUT")) {
                     Map<String, String> f = new LinkedHashMap<>();
-                    b.path("fields").fields().forEachRemaining(e -> f.put(e.getKey(), e.getValue().isNull() ? null : e.getValue().asText()));
+                    b.path("fields").fields().forEachRemaining(e -> {
+                        JsonNode v = e.getValue();
+                        if (v.isNull()) f.put(e.getKey(), null);
+                        else if (v.isArray()) { List<String> parts = new ArrayList<>(); v.forEach(x -> parts.add(x.asText())); f.put(e.getKey(), String.join(",", parts)); }
+                        else f.put(e.getKey(), v.asText());
+                    });
                     return store.updateTask(id, f, b.path("note").asText(null));
                 }
                 if (p.size() == 3 && sub.equals("notes") && m.equals("GET")) return Map.of("id", id, "notes", store.taskNotes(id));

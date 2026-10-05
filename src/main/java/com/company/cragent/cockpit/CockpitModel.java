@@ -60,6 +60,7 @@ public final class CockpitModel {
         public List<Task> scheduled = new ArrayList<>();    // open tasks with scheduledAt in the next 7 days, soonest first
         public List<Task> overdueRun = new ArrayList<>();   // open tasks whose scheduledAt is already past: did it run?
         public List<Task> withChange = new ArrayList<>();   // open tasks that have a CR number
+        public List<Task> dueSoon = new ArrayList<>();      // open tasks due within 3 days or already past due, earliest first
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

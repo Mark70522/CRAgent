@@ -129,15 +129,17 @@ public class CockpitStore {
         return t;
     }
 
-    /** What to watch besides the plan: waiting tasks, runs coming up within a week, runs already past, open CRs. */
+    /** What to watch besides the plan: waiting tasks, runs coming up within a week, runs already past, deadlines within 3 days, open CRs. */
     public synchronized Attention attention(String date) {
         String d = date == null || date.isBlank() ? today() : date;
         String weekLater = LocalDate.parse(d).plusDays(7).toString();
+        String soon = LocalDate.parse(d).plusDays(3).toString();
         Attention a = new Attention();
         for (Task t : tasks()) {
             if (!t.isOpen()) continue;
             if ("waiting".equals(t.status)) a.waiting.add(t);
             if (t.cr != null && !t.cr.isBlank()) a.withChange.add(t);
+            if (t.due != null && !t.due.isBlank() && t.due.compareTo(soon) <= 0) a.dueSoon.add(t);
             if (t.scheduledAt != null && !t.scheduledAt.isBlank()) {
                 String day = t.scheduledAt.substring(0, Math.min(10, t.scheduledAt.length()));
                 if (day.compareTo(d) < 0) a.overdueRun.add(t);
@@ -146,6 +148,7 @@ public class CockpitStore {
         }
         a.scheduled.sort(Comparator.comparing(t -> t.scheduledAt));
         a.overdueRun.sort(Comparator.comparing(t -> t.scheduledAt));
+        a.dueSoon.sort(Comparator.comparing(t -> t.due));
         return a;
     }
 
