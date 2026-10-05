@@ -21,11 +21,11 @@ export default function Dashboard() {
     <div>
       <Typography.Title level={4} style={{ marginTop: 0 }}>总览</Typography.Title>
       {err && <Alert type="error" message={err} style={{ marginBottom: 16 }} />}
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={6}><Card><Statistic title="留存的变更单" value={count('change')} /><Link to="/changes">查看</Link></Card></Col>
-        <Col span={6}><Card><Statistic title="留存的 ICE" value={count('ice')} /><Link to="/ices">查看</Link></Card></Col>
-        <Col span={6}><Card><Statistic title="跟踪的 task" value={count('task')} /><Link to="/ledger">台账</Link></Card></Col>
-        <Col span={6}><Card><Statistic title="配置" value={check ? (check.ok ? '正常' : `${check.problems.length} 个问题`) : '…'} valueStyle={{ color: check && !check.ok ? '#cf1322' : undefined }} /></Card></Col>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={12} lg={6}><Card><Statistic title="留存的变更单" value={count('change')} /><Link to="/changes">查看 ›</Link></Card></Col>
+        <Col xs={12} lg={6}><Card><Statistic title="留存的 ICE" value={count('ice')} /><Link to="/ices">查看 ›</Link></Card></Col>
+        <Col xs={12} lg={6}><Card><Statistic title="跟踪的 task" value={count('task')} /><Link to="/ledger">台账 ›</Link></Card></Col>
+        <Col xs={12} lg={6}><Card><Statistic title="配置" value={check ? (check.ok ? '正常' : `${check.problems.length} 个问题`) : '…'} valueStyle={{ color: check && !check.ok ? '#FF3B30' : undefined }} /></Card></Col>
       </Row>
       {s && (
         <Card title="接口与配置" size="small">

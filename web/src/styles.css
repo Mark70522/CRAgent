@@ -1,0 +1,89 @@
+/* Global Apple-style polish on top of the antd theme in theme.js. */
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: #F5F5F7;
+  color: #1D1D1F;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- shell ---- */
+.app-sider {
+  background: rgba(240, 240, 243, 0.72) !important;
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
+}
+.app-sider .ant-layout-sider-children { display: flex; flex-direction: column; }
+.app-brand { display: flex; align-items: center; gap: 10px; padding: 22px 20px 14px; }
+.app-brand-icon {
+  width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+  background: linear-gradient(160deg, #3d9bff, #007AFF 60%, #0058d6); color: #fff; font-size: 15px;
+  box-shadow: 0 2px 6px rgba(0, 122, 255, 0.35);
+}
+.app-brand-name { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.app-brand-sub { font-size: 11.5px; color: #86868B; }
+.app-sider .ant-menu { border-inline-end: none !important; font-size: 13.5px; }
+.app-sider .ant-menu-item-group-title { padding-top: 14px !important; font-weight: 600; letter-spacing: 0.02em; }
+.app-sider .ant-menu-item-selected { font-weight: 600; }
+.app-sider-foot { margin-top: auto; padding: 14px 20px 18px; font-size: 11.5px; color: #86868B; }
+.app-menu-scroll { flex: 1; overflow-y: auto; padding-bottom: 8px; }
+
+.app-main { height: 100vh; overflow-y: auto; position: relative; }
+.app-sider-toggle { display: none !important; position: absolute; top: 14px; left: 10px; z-index: 10; }
+.app-page { max-width: 1280px; margin: 0 auto; padding: 28px 36px 48px; }
+@media (max-width: 768px) { .app-page { padding: 18px 16px 32px; } }
+
+/* ---- page titles: large title like macOS / iOS ---- */
+.app-page h4.ant-typography, .app-page .ant-typography h4 {
+  font-size: 26px !important; font-weight: 700 !important; letter-spacing: -0.022em; line-height: 1.25 !important;
+}
+
+/* ---- cards: white, no hard border, soft shadow ---- */
+.ant-card {
+  border: none !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 18px rgba(0, 0, 0, 0.045) !important;
+}
+.ant-card .ant-card-head { border-bottom: 1px solid #F0F0F3; font-weight: 600; }
+.ant-card-small > .ant-card-head { min-height: 46px; padding-inline: 18px; }
+.ant-card-small > .ant-card-body { padding: 16px 18px; }
+.ant-row > .ant-col > .ant-card:only-child { height: 100%; }   /* single cards in a row line up */
+
+/* first / last table column breathe like the card edge */
+.ant-table-small .ant-table-thead > tr > th:first-child, .ant-table-small .ant-table-tbody > tr > td:first-child { padding-left: 18px !important; }
+.ant-table-small .ant-table-thead > tr > th:last-child, .ant-table-small .ant-table-tbody > tr > td:last-child { padding-right: 18px !important; }
+
+/* ---- tables ---- */
+.ant-table-thead > tr > th { font-weight: 500 !important; font-size: 12.5px; border-bottom: 1px solid #EEEEF0 !important; }
+.ant-table-tbody > tr > td { border-bottom: 1px solid #F2F2F5 !important; }
+.ant-table-tbody > tr:last-child > td { border-bottom: none !important; }
+
+/* ---- tags: soft pills ---- */
+.ant-tag { border: none; border-radius: 6px; padding-inline: 8px; font-weight: 500; }
+
+/* ---- lists ---- */
+.ant-list-split .ant-list-item { border-block-end-color: #F2F2F5; }
+
+/* ---- inputs: filled like macOS text fields ---- */
+.ant-input-outlined, .ant-select-outlined .ant-select-selector, .ant-input-affix-wrapper { background: #FFFFFF; }
+textarea.ant-input { line-height: 1.6; }
+
+/* ---- code-ish blocks ---- */
+pre { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+
+/* ---- scrollbars ---- */
+* { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.18) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.16); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* narrow window: sidebar hides, a button brings it back (kept last so it wins over the rules above) */
+@media (max-width: 991px) {
+  .app-sider-toggle { display: inline-flex !important; }
+  .app-page { padding: 56px 16px 32px; }
+}
+
+/* selected row in master-detail lists (templates page etc.) */
+.app-list-selected { background: rgba(0, 122, 255, 0.08) !important; }

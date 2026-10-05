@@ -44,7 +44,7 @@ export default function TemplatesPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 12 }}>
         <Card size="small" title="knowledge/templates" styles={{ body: { padding: 0 } }}>
           <List size="small" dataSource={list} renderItem={(t) => (
-            <List.Item onClick={() => open(t.name)} style={{ cursor: 'pointer', background: t.name === name ? '#e6f4ff' : undefined, padding: '8px 12px' }}>
+            <List.Item onClick={() => open(t.name)} className={t.name === name ? 'app-list-selected' : undefined} style={{ cursor: 'pointer', padding: '10px 14px' }}>
               <div><div style={{ fontWeight: 500 }}>{t.name}</div><div style={{ fontSize: 12, color: '#888' }}>{t.description}</div><div style={{ marginTop: 2 }}>{(t.matchKeywords || []).slice(0, 4).map((k) => <Tag key={k} style={{ fontSize: 11 }}>{k}</Tag>)}<span style={{ fontSize: 11, color: '#999' }}>{t.taskCount} task</span></div></div>
             </List.Item>
           )} />
