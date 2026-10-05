@@ -35,4 +35,14 @@ class TemplateServiceTest {
         assertThat(d.tasks().get(3).get("planned_end_date")).isEqualTo("2026-10-11 04:30:00");
         assertThat(d.tasksAsText().get(0).get("order")).isEqualTo("10");
     }
+
+    @Test
+    void draftsFromTemplateAloneWithoutServersStartOrSummary() {
+        ChangeDraft d = service.buildDraft(service.getTemplate("os-patch"), List.of(), "", null);
+
+        assertThat(d.fields().get("short_description")).isEqualTo("<TODO: title>");
+        assertThat(d.fields()).doesNotContainKeys("start_date", "end_date");
+        assertThat(d.tasks()).hasSize(4);
+        assertThat(d.tasks().get(0)).doesNotContainKeys("planned_start_date", "planned_end_date");
+    }
 }

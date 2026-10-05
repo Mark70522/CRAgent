@@ -40,18 +40,18 @@ public class TemplateTools {
     public ChangeTemplate getTemplate(@ToolParam(description = "Template name") String name) { return templates.getTemplate(name.trim()); }
 
     @Tool(name = "build_draft", description = """
-            Build a draft from a template: resolves the servers in the inventory, fills default fields, lays the
-            tasks out back to back from plannedStart, computes the change window, and puts a section skeleton with
+            Build a draft from a template: resolves the servers in the inventory (if any), fills default fields, (if plannedStart is given) lays
+            the tasks out back to back and computes the change window, and puts a section skeleton with
             <TODO: ...> markers into the description field. Field names are exactly what the template says (your
             interface's names). Replace every TODO with real content, then validate_draft before showing the user.""")
     public DraftResult buildDraft(
             @ToolParam(description = "Template name from list_templates") String templateName,
-            @ToolParam(description = "Server names, comma separated") String ciNames,
-            @ToolParam(description = "Planned start, yyyy-MM-dd HH:mm:ss") String plannedStart,
-            @ToolParam(description = "One-line summary for the title") String summary) {
+            @ToolParam(description = "Server names, comma separated; optional", required = false) String ciNames,
+            @ToolParam(description = "Planned start, yyyy-MM-dd HH:mm:ss; optional, without it no times are filled", required = false) String plannedStart,
+            @ToolParam(description = "One-line summary for the title; optional, without it the title is a TODO", required = false) String summary) {
         List<CiInfo> cis = new ArrayList<>();
         List<String> notes = new ArrayList<>();
-        for (String n : ciNames.split(",")) {
+        for (String n : (ciNames == null ? "" : ciNames).split(",")) {
             String q = n.trim();
             if (q.isEmpty()) continue;
             List<CiInfo> found = inv.lookup(q);
@@ -59,12 +59,12 @@ public class TemplateTools {
             else { if (found.size() > 1) notes.add("Several servers match '" + q + "', used " + found.get(0).name()); cis.add(found.get(0)); }
         }
         ChangeTemplate t = templates.getTemplate(templateName.trim());
-        ChangeDraft draft = templates.buildDraft(t, cis, plannedStart.trim(), summary);
+        ChangeDraft draft = templates.buildDraft(t, cis, plannedStart == null ? "" : plannedStart.trim(), summary);
         Map<String, String> sources = new LinkedHashMap<>();
         sources.put(t.titleField(), "template pattern + summary");
         sources.put(t.descriptionField(), "template sections, all TODO");
         sources.put("other fields", "template defaults; " + (cis.isEmpty() ? "no server resolved" : "owner group / service from inventory"));
-        sources.put(t.startField() + " / " + t.endField(), "plannedStart + task durations");
+        if (plannedStart != null && !plannedStart.isBlank()) sources.put(t.startField() + " / " + t.endField(), "plannedStart + task durations");
         sources.put("tasks", "template sequence, times computed");
         if (!cis.isEmpty()) notes.add("Maintenance window: " + cis.stream().map(c -> c.name() + " " + inv.windowFor(c)).toList());
         return new DraftResult(draft, sources, notes);

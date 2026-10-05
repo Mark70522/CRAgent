@@ -51,8 +51,9 @@ public class TemplateService {
      * tasks laid out back to back from plannedStart, change window from first task to last (or default duration).
      */
     public ChangeDraft buildDraft(ChangeTemplate t, List<CiInfo> cis, String plannedStart, String summary) {
-        LocalDateTime start = RuleEngine.parse(plannedStart);
-        if (start == null) throw new IllegalArgumentException("plannedStart must be yyyy-MM-dd HH:mm:ss, got: " + plannedStart);
+        boolean timed = plannedStart != null && !plannedStart.isBlank();
+        LocalDateTime start = timed ? RuleEngine.parse(plannedStart) : null;
+        if (timed && start == null) throw new IllegalArgumentException("plannedStart must be yyyy-MM-dd HH:mm:ss, got: " + plannedStart);
 
         Map<String, String> vars = new LinkedHashMap<>();
         vars.put("ci_list", cis.stream().map(CiInfo::name).collect(Collectors.joining(" ")));
@@ -64,7 +65,8 @@ public class TemplateService {
 
         Map<String, Object> fields = new LinkedHashMap<>();
         if (t.fields() != null) t.fields().forEach((k, v) -> fields.put(k, interpolate(v, vars)));
-        fields.put(t.titleField(), interpolate(t.shortDescriptionPattern() == null ? "${summary}" : t.shortDescriptionPattern(), vars).trim());
+        String title = summary == null || summary.isBlank() ? "<TODO: title>" : interpolate(t.shortDescriptionPattern() == null ? "${summary}" : t.shortDescriptionPattern(), vars).trim();
+        fields.put(t.titleField(), title);
 
         StringBuilder desc = new StringBuilder();
         int i = 1;
@@ -77,14 +79,17 @@ public class TemplateService {
         LocalDateTime cursor = start;
         for (ChangeTemplate.TaskTemplate tt : t.tasks() == null ? List.<ChangeTemplate.TaskTemplate>of() : t.tasks()) {
             int minutes = tt.durationMinutes() == null ? 30 : tt.durationMinutes();
-            LocalDateTime end = cursor.plusMinutes(minutes);
             Map<String, Object> task = new LinkedHashMap<>();
             if (tt.fields() != null) tt.fields().forEach((k, v) -> task.put(k, interpolate(v, vars)));
-            task.put(t.taskStartField(), cursor.format(RuleEngine.SN_DATETIME));
-            task.put(t.taskEndField(), end.format(RuleEngine.SN_DATETIME));
+            if (timed) {
+                LocalDateTime end = cursor.plusMinutes(minutes);
+                task.put(t.taskStartField(), cursor.format(RuleEngine.SN_DATETIME));
+                task.put(t.taskEndField(), end.format(RuleEngine.SN_DATETIME));
+                cursor = end;
+            }
             tasks.add(task);
-            cursor = end;
         }
+        if (!timed) return new ChangeDraft(fields, tasks);
         LocalDateTime windowEnd = cursor;
         if (t.defaultDurationMinutes() != null && start.plusMinutes(t.defaultDurationMinutes()).isAfter(windowEnd))
             windowEnd = start.plusMinutes(t.defaultDurationMinutes());

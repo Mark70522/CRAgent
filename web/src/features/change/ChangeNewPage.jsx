@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Card, Col, Form, Input, Row, Segmented, Select, Space, Steps, Table, Tag, Typography, App } from 'antd'
+import { Alert, Button, Card, Checkbox, Input, Segmented, Select, Space, Steps, Table, Tag, Typography, App } from 'antd'
 import JsonEditor from '../../components/JsonEditor'
 import { useNavigate } from 'react-router-dom'
 import FieldsEditor from '../../components/FieldsEditor'
@@ -9,7 +9,11 @@ import { changeApi, formsApi } from './changeApi'
 export default function ChangeNewPage() {
   const { message } = App.useApp()
   const navigate = useNavigate()
-  const [form] = Form.useForm()
+  const [source, setSource] = useState('template')
+  const [template, setTemplate] = useState()
+  const [copyFrom, setCopyFrom] = useState('')
+  const [copyLive, setCopyLive] = useState(false)
+  const [raw, setRaw] = useState({ fields: {}, tasks: [] })
   const [templates, setTemplates] = useState([])
   const [catalog, setCatalog] = useState([])
   const [taskCatalog, setTaskCatalog] = useState([])
@@ -21,18 +25,39 @@ export default function ChangeNewPage() {
   const [taskMode, setTaskMode] = useState('table')
 
   useEffect(() => {
-    changeApi.templates().then((t) => { setTemplates(t); if (t[0]) form.setFieldValue('template', t[0].name) }).catch((e) => message.error(e.message))
+    changeApi.templates().then((t) => { setTemplates(t); if (t[0]) setTemplate(t[0].name) }).catch((e) => message.error(e.message))
     formsApi.get('change').then((c) => setCatalog(c.fields)).catch(() => {})
     formsApi.get('task').then((c) => setTaskCatalog(c.fields)).catch(() => {})
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function draft() {
-    let v; try { v = await form.validateFields() } catch { return }
-    setBusy(true); setResult(null)
+  function load(f, t, n = []) { setFields(f || {}); setTasks(t || []); setNotes(n); setResult(null) }
+
+  async function fromTemplate() {
+    setBusy(true)
+    try { const d = await changeApi.draft({ template }); load(d.draft.fields, d.draft.tasks, d.notes) }
+    catch (e) { message.error(e.message) } finally { setBusy(false) }
+  }
+
+  /** Copy an old CR: its editable fields and tasks; read-only keys (number, state, sys_id ...) stay behind. */
+  async function fromOld() {
+    const number = copyFrom.trim()
+    if (!number) return
+    setBusy(true)
     try {
-      const d = await changeApi.draft(v)
-      setFields(d.draft.fields || {}); setTasks(d.draft.tasks || []); setNotes(d.notes || [])
+      const rec = await changeApi.get(number, copyLive)
+      const drop = (cat, extra) => new Set([...cat.filter((f) => f.readonly).map((f) => f.key), ...extra])
+      const strip = (o, keys) => Object.fromEntries(Object.entries(o || {}).filter(([k]) => !keys.has(k) && !k.startsWith('sys_')))
+      const f = strip(rec.fields, drop(catalog, ['number', 'state', 'approval', 'close_code']))
+      const t = (Array.isArray(rec.tasks) ? rec.tasks : []).map((x) => strip(x && x.fields ? x.fields : x, drop(taskCatalog, ['number', 'state'])))
+      if (!Object.keys(f).length) message.warning(`${number} 没有可复制的字段`)
+      load(f, t, [`从 ${number} 复制,计划时间和标题请按这次改`])
     } catch (e) { message.error(e.message) } finally { setBusy(false) }
+  }
+
+  function fromJson() {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { message.error('要一个 JSON 对象'); return }
+    if (raw.fields && typeof raw.fields === 'object') load(raw.fields, Array.isArray(raw.tasks) ? raw.tasks : [])
+    else load(raw, [])
   }
   async function validate() {
     setBusy(true)
@@ -58,17 +83,38 @@ export default function ChangeNewPage() {
         <Steps size="small" current={step} style={{ maxWidth: 640 }} items={[{ title: '起草' }, { title: '改字段和 task' }, { title: '校验' }, { title: '创建' }]} />
       </Space>
 
-      <Card size="small" title="起草" style={{ marginBottom: 12 }}>
-        <Form form={form} layout="vertical" requiredMark={false}>
-          <Row gutter={16}>
-            <Col xs={24} md={8}><Form.Item name="template" label="模板" rules={[{ required: true, message: '选一个模板' }]}><Select placeholder="模板" options={templates.map((t) => ({ value: t.name, label: `${t.name} · ${t.description || ''}` }))} /></Form.Item></Col>
-            <Col xs={24} md={8}><Form.Item name="servers" label="服务器(逗号分隔,查清单)" rules={[{ required: true, message: '至少一台' }]}><Input placeholder="srv-app-01, srv-app-02" /></Form.Item></Col>
-            <Col xs={24} md={8}><Form.Item name="start" label="计划开始" rules={[{ required: true, message: '要有开始时间' }]}><Input placeholder="2026-10-11 01:00:00" /></Form.Item></Col>
-            <Col xs={24} md={16}><Form.Item name="summary" label="一句话摘要(进标题)" rules={[{ required: true, message: '写一句' }]}><Input placeholder="2026-10 Windows monthly security patches" /></Form.Item></Col>
-            <Col xs={24} md={8} style={{ display: 'flex', alignItems: 'flex-end' }}><Form.Item><Button type="primary" onClick={draft} loading={busy}>{fields ? '重新生成草稿' : '生成草稿'}</Button></Form.Item></Col>
-          </Row>
-        </Form>
-        {notes.length > 0 && <Alert type="warning" showIcon message={<ul style={{ margin: 0, paddingLeft: 18 }}>{notes.map((n) => <li key={n}>{n}</li>)}</ul>} />}
+      <Card size="small" title="起草" style={{ marginBottom: 12 }} extra={<Segmented size="small" value={source} onChange={setSource} options={[{ value: 'template', label: '用模板' }, { value: 'copy', label: '复制旧单' }, { value: 'json', label: '直接 JSON' }, { value: 'copilot', label: '让 Copilot 建' }]} />}>
+        {source === 'template' && (
+          <Space wrap>
+            <Select style={{ minWidth: 360 }} placeholder="选一个模板" value={template} onChange={setTemplate} options={templates.map((t) => ({ value: t.name, label: `${t.name} · ${t.description || ''}` }))} />
+            <Button type="primary" onClick={fromTemplate} loading={busy} disabled={!template}>生成草稿</Button>
+          </Space>
+        )}
+        {source === 'copy' && (
+          <Space wrap>
+            <Input style={{ width: 220 }} placeholder="旧单号,如 CHG0031234" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} onPressEnter={fromOld} />
+            <Checkbox checked={copyLive} onChange={(e) => setCopyLive(e.target.checked)}>从接口实时读(不勾就读本地留存)</Checkbox>
+            <Button type="primary" onClick={fromOld} loading={busy} disabled={!copyFrom.trim()}>复制过来</Button>
+            <span style={{ color: '#999', fontSize: 12 }}>单号、状态、审批这类只读字段不带过来;时间记得改</span>
+          </Space>
+        )}
+        {source === 'json' && (
+          <>
+            <JsonEditor value={raw} onChange={setRaw} rows={12} />
+            <Space style={{ marginTop: 8 }}>
+              <Button type="primary" onClick={fromJson}>用这个 JSON</Button>
+              <span style={{ color: '#999', fontSize: 12 }}>{'格式 { "fields": {…}, "tasks": […] },也可以只贴 fields 那一层'}</span>
+            </Space>
+          </>
+        )}
+        {source === 'copilot' && (
+          <Typography.Paragraph style={{ margin: 0 }}>
+            在 IntelliJ 的 Copilot Chat 里直接说要建什么单,比如:
+            <Typography.Text code copyable>按 app-release 模板起草一张变更单,照 CHG0031234 的写法</Typography.Text>
+            <br />Copilot 起草、校验,你确认后它调用 create_change 创建。建好的单在 <a onClick={() => navigate('/changes')}>变更单列表</a> 里。
+          </Typography.Paragraph>
+        )}
+        {notes.length > 0 && <Alert style={{ marginTop: 12 }} type="warning" showIcon message={<ul style={{ margin: 0, paddingLeft: 18 }}>{notes.map((n) => <li key={n}>{n}</li>)}</ul>} />}
       </Card>
 
       {fields && (
