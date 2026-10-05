@@ -28,11 +28,25 @@ body {
 .app-sider .ant-menu { border-inline-end: none !important; font-size: 13.5px; }
 .app-sider .ant-menu-item-group-title { padding-top: 14px !important; font-weight: 600; letter-spacing: 0.02em; }
 .app-sider .ant-menu-item-selected { font-weight: 600; }
-.app-sider-foot { margin-top: auto; padding: 14px 20px 18px; font-size: 11.5px; color: #86868B; }
-.app-menu-scroll { flex: 1; overflow-y: auto; padding-bottom: 8px; }
+.app-sider-foot { margin-top: auto; padding: 14px 20px 18px; font-size: 11.5px; color: #86868B; white-space: nowrap; }
+.app-menu-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding-bottom: 8px; }
+.app-brand-text { white-space: nowrap; overflow: hidden; }
+.app-fold { padding: 0 14px 6px; }
+.app-fold .ant-btn { color: #6E6E73; }
+.app-fold .ant-btn:hover { color: #1D1D1F !important; }
+
+/* folded: icon rail */
+.app-sider.is-collapsed .app-brand { justify-content: center; padding: 22px 0 14px; }
+.app-sider.is-collapsed .app-fold { display: flex; justify-content: center; padding: 0 0 6px; }
+.app-sider.is-collapsed .ant-menu-inline-collapsed { width: 68px; }
+.app-sider.is-collapsed .ant-menu-inline-collapsed > .ant-menu-item {
+  margin-inline: 10px !important; width: 48px !important; padding-inline: 0 !important; display: flex; justify-content: center; align-items: center;
+}
+.app-sider.is-collapsed .ant-menu-inline-collapsed > .ant-menu-item .ant-menu-title-content { display: none; }
+.app-sider.is-collapsed .ant-menu-inline-collapsed > .ant-menu-item .anticon { margin: 0 !important; }
+.app-sider.is-collapsed .ant-menu-item-divider { margin: 8px 16px; border-color: rgba(0,0,0,0.08); }
 
 .app-main { height: 100vh; overflow-y: auto; position: relative; }
-.app-sider-toggle { display: none !important; position: absolute; top: 14px; left: 10px; z-index: 10; }
 .app-page { max-width: 1280px; margin: 0 auto; padding: 28px 36px 48px; }
 @media (max-width: 768px) { .app-page { padding: 18px 16px 32px; } }
 
@@ -79,10 +93,9 @@ pre { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
 ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.16); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-track { background: transparent; }
 
-/* narrow window: sidebar hides, a button brings it back (kept last so it wins over the rules above) */
+/* narrow window: the sidebar folds to the icon rail by itself (kept last so it wins over the rules above) */
 @media (max-width: 991px) {
-  .app-sider-toggle { display: inline-flex !important; }
-  .app-page { padding: 56px 16px 32px; }
+  .app-page { padding: 20px 16px 32px; }
 }
 
 /* tasks editor: drag handle and drop marker */
