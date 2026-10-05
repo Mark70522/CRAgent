@@ -5,6 +5,7 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -58,6 +59,19 @@ public class CallTool {
                 int i = 0;
                 while ((i = line.indexOf("\"name\":\"", i)) >= 0) { int e = line.indexOf('"', i + 8); names.add(line.substring(i + 8, e)); i = e; }
                 System.out.println(names.size() + " tools: " + names);
+                // what the client sends with every prompt: the whole definition list (~4 chars per token for this JSON)
+                System.out.println("definitions: " + line.length() + " chars, ~" + line.length() / 4 + " tokens");
+                List<int[]> starts = new ArrayList<>();
+                int j = 0;
+                while ((j = line.indexOf("{\"name\":\"", j)) >= 0) { starts.add(new int[]{j}); j++; }
+                List<String> sizes = new ArrayList<>();
+                for (int k = 0; k < starts.size(); k++) {
+                    int from = starts.get(k)[0], to = k + 1 < starts.size() ? starts.get(k + 1)[0] : line.length();
+                    int end = line.indexOf('"', from + 9);
+                    sizes.add(String.format("%6d %s", to - from, line.substring(from + 9, end)));
+                }
+                sizes.sort(Comparator.reverseOrder());
+                System.out.println("largest: " + sizes.subList(0, Math.min(8, sizes.size())).stream().map(String::trim).toList());
                 continue;
             }
             int t = line.indexOf("\"text\":\"");
