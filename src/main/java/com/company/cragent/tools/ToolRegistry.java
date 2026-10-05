@@ -24,7 +24,7 @@ public class ToolRegistry {
     /** Tool name -> group. Everything not listed here is core (always on). */
     static final Map<String, List<String>> GROUPS = new LinkedHashMap<>();
     static {
-        GROUPS.put("cr", List.of("lookup_ci", "lookup_service", "list_templates", "get_template", "build_draft", "validate_draft", "validate_change",
+        GROUPS.put("cr", List.of("lookup_ci", "lookup_service", "list_templates", "get_template", "build_draft", "draft_from_change", "validate_draft", "validate_change",
                 "create_change", "update_change", "create_task", "cancel_task", "close_task",
                 "read_rules", "list_examples", "read_example", "draft_ice", "get_ice", "create_ice", "update_ice", "ice_score"));
         GROUPS.put("learn", List.of("read_rules", "add_hard_rule", "add_soft_rule", "save_example", "save_rejected", "eval_rules", "list_examples", "read_example",
@@ -68,13 +68,18 @@ public class ToolRegistry {
     public synchronized List<ToolCallback> init(List<ToolCallback> tools) {
         all.clear(); enabled.clear(); enabledGroups.clear();
         for (ToolCallback t : tools) all.put(t.getToolDefinition().name(), t);
+        // mode all + load: only the listed groups (and core); mode all alone: every group; mode groups: core only
+        Set<String> atStart = props.groups() ? Set.of() : props.load().isEmpty() ? GROUPS.keySet() : new LinkedHashSet<>(props.load());
+        List<String> unknown = atStart.stream().filter(g -> !GROUPS.containsKey(g)).toList();
+        if (!unknown.isEmpty()) log.warn("tools.load names unknown group(s) {}; groups are {}", unknown, GROUPS.keySet());
         List<ToolCallback> startup = new ArrayList<>();
         for (ToolCallback t : tools) {
             String name = t.getToolDefinition().name();
-            if (!props.groups() || isCore(name)) { startup.add(t); enabled.add(name); }
+            boolean inLoaded = atStart.stream().anyMatch(g -> GROUPS.getOrDefault(g, List.of()).contains(name));
+            if (isCore(name) || inLoaded) { startup.add(t); enabled.add(name); }
         }
-        if (!props.groups()) enabledGroups.addAll(GROUPS.keySet());
-        log.info("tools mode={} registered at startup: {} of {}", props.mode(), startup.size(), all.size());
+        atStart.stream().filter(GROUPS::containsKey).forEach(enabledGroups::add);
+        log.info("tools mode={} load={} registered at startup: {} of {}", props.mode(), props.load(), startup.size(), all.size());
         return startup;
     }
 

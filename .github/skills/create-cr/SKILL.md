@@ -1,6 +1,6 @@
 ---
 name: create-cr
-description: Create a ServiceNow change request from a short instruction (servers or service, what, when). Drafts from a template, fills fields from the inventory and past changes, lays out tasks with times, validates against the rules, and creates the CR through the configured endpoint only after the user confirms. Use when the user asks to create / draft / raise a CR.
+description: Create a ServiceNow change request from a short instruction. Starts from a template, from an old CR ("照着 CHG… 建一张"), or from JSON the user pastes; fills fields from the inventory and past changes, lays out tasks, validates against the rules, and creates the CR through the configured endpoint only after the user confirms. Use when the user asks to create / draft / raise / copy a CR.
 ---
 
 # create-cr
@@ -9,8 +9,14 @@ Goal: a change request that passes approval the first time. Follow the steps in 
 
 ## 1. Understand
 
-Extract: servers or service name, what is being changed, desired start time, anything specific the user
-gave (ticket numbers, patch names, versions, business confirmation). No start time → ask.
+Extract what the user gave: an old CR to copy, servers or service name, what is being changed, a start
+time, anything specific (ticket numbers, patch names, versions, business confirmation). Nothing here is
+mandatory up front - draft with what you have and ask for the rest at step 5.
+
+Pick the starting point (the page offers the same three):
+- the user names an earlier CR ("照着 / 参考 / 跟上次一样 CHG0031234") → **from an old CR**;
+- the user pastes JSON fields → **from JSON** (use them as the draft fields as they are);
+- otherwise → **from a template**.
 
 Is this CR for one of the user's cockpit tasks? `list_tasks` (open) and match by wording ("给 CCS PROD
 打补丁" ↔ a task about CCS PROD patching). If one matches, remember its id and use its `scheduledAt`
@@ -32,12 +38,23 @@ as the default start time; if the task has a `cr` already, say so and stop - rev
 
 ## 3. Build
 
-1. `build_draft` with template, servers, planned start, one-line summary.
-2. Replace every `<TODO: ...>` in the description field with concrete content from the user's words and
-   the examples. Keep the numbered sections.
-3. Adjust task durations if the user or the examples say so; tasks stay back to back inside the window.
+1. Get a draft:
+   - from a template: `build_draft` with the template; servers, planned start and summary are optional
+     (no start → no task times, no summary → the title is a TODO you fill in);
+   - from an old CR: `draft_from_change` with its number. It already dropped number / state / approval /
+     sys_* and read-only fields and **cleared every date-time field**: set the new times, rewrite the
+     title and the description for this change - never reuse the old dates or the old change's facts;
+   - from JSON: the user's fields as they are.
+2. Replace every `<TODO: ...>` with concrete content from the user's words and the examples. Keep the
+   numbered sections.
+3. Tasks: keep them in `order` 10, 20, 30 …; when you add, remove or reorder, renumber that way. Times
+   back to back inside the window, each task keeping its duration.
 4. Write justification / implementation / backout / test plans concretely (soft rules SR-002, SR-003).
-   Template defaults are starting points. Field names stay exactly as the template gives them.
+   Template defaults are starting points. Field names stay exactly as the draft gives them.
+5. Field values keep their JSON type: a list stays a list (`["srv-01","srv-02"]`), an object stays an
+   object, a number stays a number. A reference field read from the interface looks like
+   `{"value": "<id>", "display_value": "<name>"}` - keep it as it is; never turn a list or object into a
+   string.
 
 ## 4. Validate and self-review
 

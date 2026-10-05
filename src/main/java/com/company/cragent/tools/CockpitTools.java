@@ -103,7 +103,8 @@ public class CockpitTools {
     @Tool(name = "get_day", description = """
             Everything needed for the morning brief or a status check: the day's file (brief, plan, timeline, notes,
             summary), the planned tasks in full, tasks carried over from earlier days, `attention` (waiting tasks,
-            runs scheduled within 7 days, runs whose scheduled time already passed, open tasks with a CR number),
+            runs scheduled within 7 days, runs whose scheduled time already passed, deadlines within 3 days or past
+            (dueSoon), open tasks with a CR number),
             the last 7 closed days' stats and the knowledge topics that exist. date defaults to today.""")
     public Map<String, Object> getDay(@ToolParam(description = "yyyy-MM-dd, default today", required = false) String date) {
         Day day = store.day(date);

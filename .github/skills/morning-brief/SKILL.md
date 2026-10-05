@@ -12,7 +12,7 @@ A single word from the user ("早") is the whole trigger: do not ask what they m
 
 0. `open_cockpit` (view morning) so the page is on screen while you work. Once; never again in the same brief.
 1. `get_day` (today). It returns: today's file (may be empty), carried-over tasks, all open tasks,
-   `attention` (waiting / scheduled / overdueRun / withChange), the previous day's file (summary,
+   `attention` (waiting / scheduled / overdueRun / dueSoon / withChange), the previous day's file (summary,
    tomorrow list, notes), the last 7 days' stats and the knowledge topics.
 2. For each candidate task that has a knowledge topic or task notes worth checking, `task_notes` /
    `search_knowledge` - only when it changes the advice (a past pitfall, a real duration).
@@ -34,6 +34,8 @@ exceeds a realistic 5-6 working hours.
   done (and is the CR closed?). If it slipped → new `scheduledAt`.
 - `scheduled` within 3 days: a pre-check line - is the CR created (`cr` empty → offer create-cr),
   approved (ask; the user knows), is the window confirmed. A run tomorrow night is a today item.
+- `dueSoon`: due within 3 days or already past due. Past due → ask: done, re-date, or drop? Due within
+  3 days and not in the three → say why it can wait, or propose swapping it in.
 - `waiting`: one line each with what it waits for. Ask only if it has waited more than a week.
 - `withChange` otherwise: just list number + title.
 
@@ -53,4 +55,6 @@ After confirmation: `plan_day` with the task ids in order, `brief` = the text sh
 the three things and why, plus one sentence on the watch list), `timeline` = the slots. Tasks the user
 chose to drop: `update_task` status=dropped. Re-dated: due=... . Now waiting on something: waitingOn=... .
 
-Reply with one line: what was written and the cockpit page address from `get_day.cockpitUrl`.
+Reply with one line: what was written and the cockpit page address from `get_day.cockpitUrl`. The page
+shows the same plan ("今天做"); the user can drag tasks in and out and reorder there, and click a task to
+edit any of its fields - the next `get_day` reads whatever they changed.

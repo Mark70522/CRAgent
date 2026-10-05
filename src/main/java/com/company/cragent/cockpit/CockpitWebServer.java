@@ -185,6 +185,7 @@ public class CockpitWebServer {
                 if (p.size() == 2 && m.equals("GET")) return record("change", id, live);
                 if (p.size() == 2 && m.equals("PUT")) return sn.updateChange(id, fields(b.path("fields")), true);
                 if (p.size() == 3 && sub.equals("tasks") && m.equals("GET")) return taskList(id);
+                if (p.size() == 3 && sub.equals("as-draft") && m.equals("GET")) return templates.draftFromChange(id, live);
                 if (p.size() == 3 && sub.equals("tasks") && m.equals("POST")) return sn.createTask(id, fields(b.path("fields")), true);
             }
             case "tasks" -> {

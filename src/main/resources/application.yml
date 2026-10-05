@@ -39,7 +39,9 @@ inventory:
 servicenow:
   timeout-ms: 30000
 
-# Which tools Copilot sees. all = every tool at startup; groups = core set only, Copilot loads groups with
-# use_tools (fewer tokens per prompt; needs a client that honours tools/list_changed). Override in cr-agent.yml.
+# Which tools Copilot sees. all = tools registered at startup (load: [cr, cockpit] limits it to those groups,
+# works with any client); groups = core set only, Copilot loads groups with use_tools (needs a client that
+# honours tools/list_changed). Override in cr-agent.yml.
 tools:
   mode: all
+  load: []

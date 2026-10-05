@@ -32,16 +32,27 @@ class ToolRegistryTest {
     @Test
     void allModeRegistersEverythingAtStartup() {
         List<String> sink = new ArrayList<>();
-        ToolRegistry r = new ToolRegistry(new ToolsProperties("all", null), recorder(sink));
+        ToolRegistry r = new ToolRegistry(new ToolsProperties("all", null, null), recorder(sink));
         assertThat(r.init(all())).hasSize(15);
         assertThat(r.summary().get("enabledGroups")).asString().contains("cr", "learn", "cockpit", "integration");
         assertThat(sink).isEmpty();
     }
 
     @Test
+    void loadPicksTheGroupsRegisteredAtStartup() {
+        List<String> sink = new ArrayList<>();
+        ToolRegistry r = new ToolRegistry(new ToolsProperties("all", null, List.of("CR", "cockpit")), recorder(sink));
+        assertThat(r.init(all())).extracting(t -> t.getToolDefinition().name())
+                .contains("status", "get_change", "lookup_ci", "create_change", "read_rules", "list_examples", "add_tasks")   // core + cr + cockpit
+                .doesNotContain("add_hard_rule", "probe");                                                                     // learn-only, integration
+        assertThat(r.summary().get("enabledGroups")).asString().isEqualTo("[cr, cockpit]");
+        assertThat(sink).isEmpty();   // nothing changes at run time: works with any client
+    }
+
+    @Test
     void groupsModeStartsWithCoreAndSwitchesGroups() {
         List<String> sink = new ArrayList<>();
-        ToolRegistry r = new ToolRegistry(new ToolsProperties("groups", List.of("lookup_ci")), recorder(sink));
+        ToolRegistry r = new ToolRegistry(new ToolsProperties("groups", List.of("lookup_ci"), null), recorder(sink));
         List<ToolCallback> startup = r.init(all());
         assertThat(startup).extracting(t -> t.getToolDefinition().name())
                 .containsExactly("status", "remember", "search_knowledge", "get_change", "get_day", "open_cockpit", "use_tools", "drop_tools", "lookup_ci");

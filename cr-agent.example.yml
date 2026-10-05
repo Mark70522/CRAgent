@@ -123,3 +123,12 @@ cockpit:
   dir: ./cockpit
   port: 7777
   web: true                            # false = 不起页面
+
+# ---- Copilot 能看到哪些工具 ----
+# 工具越少,每次提问带的说明越短,小模型(GPT-5 mini)也越不容易选错。
+# 分组: cr(变更单、ICE) learn(规则、示例、历史) cockpit(日课任务、笔记、知识) integration(配置检查、probe)
+# load 只在启动时生效,任何 Copilot 版本都支持;不写或留空 = 全部加载。改完重启 Copilot 的 MCP 服务。
+# 平时: [cr, cockpit];对接接口那几天加上 integration;整理规则时加上 learn。
+tools:
+  mode: all
+  # load: [cr, cockpit]

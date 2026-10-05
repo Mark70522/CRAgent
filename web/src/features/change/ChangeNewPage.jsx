@@ -39,20 +39,13 @@ export default function ChangeNewPage() {
     catch (e) { message.error(e.message) } finally { setBusy(false) }
   }
 
-  /** Copy an old CR: its editable fields and tasks; read-only keys (number, state, sys_id ...) stay behind. */
+  /** Copy an old CR: same rules as Copilot's draft_from_change (server side) - identity and state dropped, dates cleared. */
   async function fromOld() {
     const number = copyFrom.trim()
     if (!number) return
     setBusy(true)
-    try {
-      const rec = await changeApi.get(number, copyLive)
-      const drop = (cat, extra) => new Set([...cat.filter((f) => f.readonly).map((f) => f.key), ...extra])
-      const strip = (o, keys) => Object.fromEntries(Object.entries(o || {}).filter(([k]) => !keys.has(k) && !k.startsWith('sys_')))
-      const f = strip(rec.fields, drop(catalog, ['number', 'state', 'approval', 'close_code']))
-      const t = (Array.isArray(rec.tasks) ? rec.tasks : []).map((x) => strip(x && x.fields ? x.fields : x, drop(taskCatalog, ['number', 'state'])))
-      if (!Object.keys(f).length) message.warning(`${number} 没有可复制的字段`)
-      load(f, t, [`从 ${number} 复制,计划时间和标题请按这次改`])
-    } catch (e) { message.error(e.message) } finally { setBusy(false) }
+    try { const d = await changeApi.asDraft(number, copyLive); load(d.draft.fields, d.draft.tasks, d.notes) }
+    catch (e) { message.error(e.message) } finally { setBusy(false) }
   }
 
   function fromJson() {
@@ -91,7 +84,7 @@ export default function ChangeNewPage() {
             <Input style={{ width: 220 }} placeholder="旧单号,如 CHG0031234" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} onPressEnter={fromOld} />
             <Checkbox checked={copyLive} onChange={(e) => setCopyLive(e.target.checked)}>从接口实时读(不勾就读本地留存)</Checkbox>
             <Button type="primary" onClick={fromOld} loading={busy} disabled={!copyFrom.trim()}>复制过来</Button>
-            <span style={{ color: '#999', fontSize: 12 }}>单号、状态、审批这类只读字段不带过来;时间记得改</span>
+            <span style={{ color: '#999', fontSize: 12 }}>单号、状态、审批、只读字段不带过来,时间字段清空;和 Copilot 的 draft_from_change 同一套规则</span>
           </Space>
         )}
         {source === 'json' && (

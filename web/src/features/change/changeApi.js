@@ -6,6 +6,7 @@ export const changeApi = {
   create:   (fields, tasks, taskId) => http.post('/changes', { fields, tasks, taskId }),
   update:   (number, fields)       => http.put(`/changes/${encodeURIComponent(number)}`, { fields }),
   draft:    (body)                 => http.post('/changes/draft', body),
+  asDraft:  (number, live = false) => http.get(`/changes/${encodeURIComponent(number)}/as-draft`, { params: live ? { live: 1 } : {} }),
   validate: (fields, tasks)        => http.post('/changes/validate', { fields, tasks }),
   tasks:    (number)               => http.get(`/changes/${encodeURIComponent(number)}/tasks`),
   addTask:  (number, fields)       => http.post(`/changes/${encodeURIComponent(number)}/tasks`, { fields }),
