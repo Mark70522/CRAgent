@@ -33,6 +33,7 @@ export const menuItems = [
       { key: '/ices', label: 'ICE 列表' },
       { key: '/ices/new', label: '登记 ICE' },
       { key: '/ices/update', label: '更新 ICE' },
+      { key: '/ices/score', label: '查 ICE 分数' },
     ],
   },
   { key: '/ledger', icon: <DatabaseOutlined />, label: '本地台账' },

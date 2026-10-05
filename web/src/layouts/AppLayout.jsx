@@ -10,7 +10,7 @@ export default function AppLayout() {
   const location = useLocation()
   // on a detail page: "update" when it was opened for editing, otherwise the list
   const editing = new URLSearchParams(location.search).get('edit') === '1'
-  const own = ['/changes/new', '/changes/update', '/ices/new', '/ices/update']
+  const own = ['/changes/new', '/changes/update', '/ices/new', '/ices/update', '/ices/score']
   const selected = own.includes(location.pathname) ? location.pathname
     : location.pathname.startsWith('/changes/') ? (editing ? '/changes/update' : '/changes')
     : location.pathname.startsWith('/ices/') ? (editing ? '/ices/update' : '/ices') : location.pathname

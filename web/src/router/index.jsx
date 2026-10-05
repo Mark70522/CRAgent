@@ -7,6 +7,7 @@ import ChangeNewPage from '../features/change/ChangeNewPage'
 import IceListPage from '../features/ice/IceListPage'
 import IceDetailPage from '../features/ice/IceDetailPage'
 import IceNewPage from '../features/ice/IceNewPage'
+import IceScorePage from '../features/ice/IceScorePage'
 import LedgerPage from '../features/ledger/LedgerPage'
 import FormsPage from '../features/forms/FormsPage'
 import HistoryPage from '../features/history/HistoryPage'
@@ -35,6 +36,7 @@ export default function AppRouter() {
         <Route path="templates" element={<TemplatesPage />} />
         <Route path="ices" element={<IceListPage />} />
         <Route path="ices/new" element={<IceNewPage />} />
+        <Route path="ices/score" element={<IceScorePage />} />
         <Route path="ices/update" element={<OpenForEdit title="更新 ICE" base="/ices" placeholder="ICE 号" list={() => iceApi.list()} />} />
         <Route path="ices/:id" element={<IceDetailPage />} />
         <Route path="ledger" element={<LedgerPage />} />
