@@ -3,22 +3,37 @@ import { Button, Card, Input, List, Popconfirm, Space, Tag, Typography, App } fr
 import { useSearchParams } from 'react-router-dom'
 import http from '../../api/request'
 
-/** The templates under knowledge/templates/, edited as YAML. Both the new-change page and Copilot read these files. */
+const NEW_TEMPLATE = (n) => ({
+  name: n,
+  description: '',
+  match_keywords: [],
+  fields: { type: 'normal', risk: 'Moderate' },
+  short_description_pattern: '[CHANGE] {ci_list} - {summary}',
+  default_duration_minutes: 240,
+  tasks: [{ order: 10, short_description: 'Pre-check', duration_minutes: 30, assignment_group: '{ci_owner_group}' }],
+  description_sections: [{ heading: '变更对象', hint: '' }],
+})
+
+function parseError(text) { try { JSON.parse(text); return '' } catch (e) { return e.message } }
+
+/** The templates under knowledge/templates/, edited as JSON. Both the new-change page and Copilot read these files. */
 export default function TemplatesPage() {
   const { message } = App.useApp()
   const [params] = useSearchParams()
   const [list, setList] = useState([])
   const [name, setName] = useState(params.get('name') || '')
-  const [yaml, setYaml] = useState('')
+  const [text, setText] = useState('')
   const [dirty, setDirty] = useState(false)
+  const err = name ? parseError(text) : ''
 
   async function load() { try { const t = await http.get('/templates'); setList(t); if (!name && t[0]) open(t[0].name) } catch (e) { message.error(e.message) } }
-  async function open(n) { try { const r = await http.get(`/template-files/${encodeURIComponent(n)}`); setName(n); setYaml(r.yaml); setDirty(false) } catch (e) { message.error(e.message) } }
+  async function open(n) { try { const r = await http.get(`/template-files/${encodeURIComponent(n)}`); setName(n); setText(r.json); setDirty(false) } catch (e) { message.error(e.message) } }
   useEffect(() => { load(); if (name) open(name) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function save() { try { await http.put(`/template-files/${encodeURIComponent(name)}`, { yaml }); message.success('已保存'); setDirty(false); load() } catch (e) { message.error(e.message) } }
-  async function remove() { try { await http.delete(`/template-files/${encodeURIComponent(name)}`); message.success('已删除'); setName(''); setYaml(''); load() } catch (e) { message.error(e.message) } }
-  function create() { const n = window.prompt('新模板名(字母数字和 -)'); if (!n) return; setName(n); setDirty(true); setYaml(`name: ${n}\ndescription: \nmatch_keywords: []\nfields:\n  type: normal\n  risk: Moderate\nshort_description_pattern: "[CHANGE] {ci_list} - {summary}"\ndefault_duration_minutes: 240\ntasks:\n  - order: 10\n    short_description: Pre-check\n    duration_minutes: 30\n    assignment_group: "{ci_owner_group}"\ndescription_sections:\n  - heading: 变更对象\n    hint: \n`) }
+  async function save() { try { await http.put(`/template-files/${encodeURIComponent(name)}`, { json: text }); message.success('已保存'); setDirty(false); load() } catch (e) { message.error(e.message) } }
+  async function remove() { try { await http.delete(`/template-files/${encodeURIComponent(name)}`); message.success('已删除'); setName(''); setText(''); load() } catch (e) { message.error(e.message) } }
+  function create() { const n = window.prompt('新模板名(字母数字和 -)'); if (!n) return; setName(n); setDirty(true); setText(JSON.stringify(NEW_TEMPLATE(n), null, 2)) }
+  function pretty() { if (!err) { setText(JSON.stringify(JSON.parse(text), null, 2)); setDirty(true) } }
 
   return (
     <div>
@@ -34,9 +49,10 @@ export default function TemplatesPage() {
             </List.Item>
           )} />
         </Card>
-        <Card size="small" title={name || '选一个模板'} extra={name && <Space><Button type="primary" size="small" onClick={save} disabled={!dirty}>保存</Button><Popconfirm title="删除这个模板文件?" onConfirm={remove}><Button size="small" danger>删除</Button></Popconfirm></Space>}>
-          {name ? <Input.TextArea value={yaml} onChange={(e) => { setYaml(e.target.value); setDirty(true) }} rows={30} spellCheck={false} style={{ fontFamily: 'Consolas, Menlo, monospace', fontSize: 12.5 }} /> : <span style={{ color: '#999' }}>左边选一个,或「新模板」</span>}
-          <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>fields 里的键名是你们接口的标准名;{'{ci_list}'} {'{summary}'} {'{ci_owner_group}'} {'{environment}'} 会在起草时替换。保存即生效,不用重启。</div>
+        <Card size="small" title={name || '选一个模板'} extra={name && <Space><Button size="small" onClick={pretty} disabled={!!err}>格式化</Button><Button type="primary" size="small" onClick={save} disabled={!dirty || !!err}>保存</Button><Popconfirm title="删除这个模板文件?" onConfirm={remove}><Button size="small" danger>删除</Button></Popconfirm></Space>}>
+          {name ? <Input.TextArea value={text} onChange={(e) => { setText(e.target.value); setDirty(true) }} rows={30} spellCheck={false} style={{ fontFamily: 'Consolas, Menlo, monospace', fontSize: 12.5, borderColor: err ? '#ff4d4f' : undefined }} /> : <span style={{ color: '#999' }}>左边选一个,或「新模板」</span>}
+          {name && <div style={{ marginTop: 6 }}>{err ? <Tag color="red">JSON 有错:{err}</Tag> : <Tag color="green">JSON 合法</Tag>}</div>}
+          <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>fields 里的键名是你们接口的标准名;{'{ci_list}'} {'{summary}'} {'{ci_owner_group}'} {'{environment}'} 会在起草时替换。保存即生效,不用重启;旧的 .yaml 模板保存一次就变成 .json。</div>
         </Card>
       </div>
     </div>

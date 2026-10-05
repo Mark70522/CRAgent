@@ -37,7 +37,7 @@ Goal: nothing learned today is lost, and tomorrow starts pre-planned.
    `noteIndex` so the note is marked saved. Do not save anything the user did not confirm; what they
    decline stays in the day log only and is never proposed again (it will be a duplicate).
 4. If a pitfall changes how a template or rule should be (e.g. the os-patch task order), say so and
-   offer to change `knowledge/templates/*.yaml` or add a rule via the learn-rules skill.
+   offer to change `knowledge/templates/*.json` or add a rule via the learn-rules skill.
 
 ## 3. Tomorrow
 

@@ -74,7 +74,7 @@ export default function HistoryPage() {
       <Modal title="存成模板" open={!!naming} onOk={saveTemplate} onCancel={() => setNaming(null)} okText="写入 knowledge/templates">
         {naming && <div style={{ marginBottom: 10, color: '#666' }}>{naming.service} · {naming.pattern} · {naming.count} 张</div>}
         <Input placeholder="模板名(留空按服务和模式自动起)" value={name} onChange={(e) => setName(e.target.value)} />
-        <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>写入后在「模板」页可以改 YAML;新建变更单和 Copilot 的 create-cr 立刻能选到。</div>
+        <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>写入后在「模板」页可以改 JSON;新建变更单和 Copilot 的 create-cr 立刻能选到。</div>
       </Modal>
     </div>
   )

@@ -1,0 +1,60 @@
+{
+  "name" : "os-patch",
+  "description" : "Operating system patching (Windows / Linux monthly or quarterly patches)",
+  "match_keywords" : [ "patch", "补丁", "windows update", "kb", "yum", "rhel", "security update" ],
+  "fields" : {
+    "type" : "normal",
+    "category" : "Software",
+    "risk" : "Moderate",
+    "impact" : "2 - Medium",
+    "justification" : "Monthly security patching required by the vulnerability management policy",
+    "implementation_plan" : "Execute the change tasks in order; each task has an owner and a planned time.",
+    "backout_plan" : "Restore the VM snapshot taken in the pre-check task (approx. 20 minutes).",
+    "test_plan" : "After reboot: OS services up, application health check returns OK, no critical events in the log."
+  },
+  "short_description_pattern" : "[PATCH] {ci_list} - {summary}",
+  "default_duration_minutes" : 240,
+  "tasks" : [ {
+    "order" : 10,
+    "short_description" : "Pre-check and snapshot",
+    "description" : "Confirm backups, take VM snapshot, record service baseline",
+    "duration_minutes" : 30,
+    "assignment_group" : "{ci_owner_group}"
+  }, {
+    "order" : 20,
+    "short_description" : "Apply OS patches",
+    "description" : "Install approved patch baseline from WSUS / Satellite",
+    "duration_minutes" : 120,
+    "assignment_group" : "{ci_owner_group}"
+  }, {
+    "order" : 30,
+    "short_description" : "Reboot and validate services",
+    "duration_minutes" : 45,
+    "assignment_group" : "{ci_owner_group}"
+  }, {
+    "order" : 40,
+    "short_description" : "Post-check and close",
+    "description" : "Compare against baseline, notify application owner, close tasks",
+    "duration_minutes" : 15,
+    "assignment_group" : "{ci_owner_group}"
+  } ],
+  "description_sections" : [ {
+    "heading" : "变更对象",
+    "hint" : "每台服务器的名称、环境、OS、所属应用"
+  }, {
+    "heading" : "补丁清单及来源",
+    "hint" : "补丁月份/季度、KB 或 advisory 编号、来源基线 (WSUS/Satellite)"
+  }, {
+    "heading" : "影响范围",
+    "hint" : "哪个业务应用、用户可见影响、持续时间、是否已通知业务方"
+  }, {
+    "heading" : "执行步骤",
+    "hint" : "可以写\"见 change tasks\",但要说明顺序和关键检查点"
+  }, {
+    "heading" : "验证方法",
+    "hint" : "服务状态、健康检查接口、日志检查、由谁验证"
+  }, {
+    "heading" : "回退方案",
+    "hint" : "具体动作 (还原快照/卸载补丁)、耗时、是否演练过"
+  } ]
+}

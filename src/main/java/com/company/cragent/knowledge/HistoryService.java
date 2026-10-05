@@ -9,8 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.Yaml;
+import com.company.cragent.template.TemplateService;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -146,7 +145,7 @@ public class HistoryService {
 
     // ------------------------------------------------------------------ template from a group
 
-    /** Writes knowledge/templates/<name>.yaml from a group: agreed field values, title pattern, latest tasks and description headings. */
+    /** Writes knowledge/templates/<name>.json from a group: agreed field values, title pattern, latest tasks and description headings. */
     public Map<String, Object> templateFromGroup(String groupKey, String name) {
         Group g = groups().stream().filter(x -> x.key().equals(groupKey)).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("No such group: " + groupKey));
@@ -165,49 +164,61 @@ public class HistoryService {
         t.put("description_sections", sectionsOf(lf.getOrDefault("description", "")));
         t.put("source", Map.of("service", g.service(), "pattern", g.pattern(), "numbers", g.numbers(), "generated", java.time.LocalDate.now().toString()));
 
-        Path f = knowledge.templatesDir().resolve(tname + ".yaml");
-        try {
-            Files.createDirectories(f.getParent());
-            Files.writeString(f, yaml().dump(t), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new IllegalStateException("Cannot write " + f + ": " + e.getMessage(), e);
-        }
+        Path f;
+        try { f = save(tname, json.writerWithDefaultPrettyPrinter().writeValueAsString(t)); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalStateException(e.getMessage(), e); }
         return Map.of("name", tname, "file", f.toString().replace('\\', '/'), "template", t);
     }
 
-    /** Raw YAML of one template, for the editor page. */
+    /** One template as pretty JSON, for the editor page. An old YAML template comes back converted. */
     public String readTemplate(String name) {
-        Path f = templateFile(name);
-        try { return Files.readString(f, StandardCharsets.UTF_8); } catch (IOException e) { throw new IllegalArgumentException("No template " + name); }
+        Path f = templateFiles(name).stream().filter(Files::exists).findFirst().orElseThrow(() -> new IllegalArgumentException("No template " + name));
+        try {
+            if (f.toString().endsWith(".json")) return Files.readString(f, StandardCharsets.UTF_8);
+            return json.writerWithDefaultPrettyPrinter().writeValueAsString(TemplateService.readMap(f));
+        } catch (IOException e) { throw new IllegalStateException("Cannot read " + f + ": " + e.getMessage(), e); }
     }
 
-    /** Save edited YAML; it must parse and keep its name. */
+    /** Save edited JSON; it must be an object with a name. Writes <name>.json and drops an old YAML copy. */
     public Map<String, Object> writeTemplate(String name, String text) {
-        Object parsed = new Yaml().load(text);
-        if (!(parsed instanceof Map<?, ?> m) || m.get("name") == null) throw new IllegalArgumentException("YAML must be a map with a 'name'");
-        Path f = templateFile(name);
-        try { Files.createDirectories(f.getParent()); Files.writeString(f, text, StandardCharsets.UTF_8); }
-        catch (IOException e) { throw new IllegalStateException("Cannot write " + f + ": " + e.getMessage(), e); }
+        com.fasterxml.jackson.databind.JsonNode parsed;
+        try { parsed = json.readTree(text); } catch (com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalArgumentException("Not valid JSON: " + e.getOriginalMessage()); }
+        if (parsed == null || !parsed.isObject() || parsed.path("name").asText("").isBlank()) throw new IllegalArgumentException("Template JSON must be an object with a 'name'");
+        Path f = save(name, text);
         return Map.of("name", name, "file", f.toString().replace('\\', '/'));
     }
 
     public boolean deleteTemplate(String name) {
-        try { return Files.deleteIfExists(templateFile(name)); } catch (IOException e) { throw new IllegalStateException(e.getMessage(), e); }
+        boolean any = false;
+        try { for (Path f : templateFiles(name)) any |= Files.deleteIfExists(f); } catch (IOException e) { throw new IllegalStateException(e.getMessage(), e); }
+        return any;
     }
 
     // ------------------------------------------------------------------ helpers
 
-    private Path templateFile(String name) {
+    private Path save(String name, String text) {
+        List<Path> files = templateFiles(name);
+        Path f = files.get(0);
+        try {
+            Files.createDirectories(f.getParent());
+            Files.writeString(f, text, StandardCharsets.UTF_8);
+            for (Path old : files.subList(1, files.size())) Files.deleteIfExists(old);
+        } catch (IOException e) { throw new IllegalStateException("Cannot write " + f + ": " + e.getMessage(), e); }
+        return f;
+    }
+
+    /** <name>.json first, then the old YAML names. */
+    private List<Path> templateFiles(String name) {
         String n = slug(name);
         if (n.isEmpty()) throw new IllegalArgumentException("template name is empty");
-        return knowledge.templatesDir().resolve(n + ".yaml");
+        return TemplateService.EXTENSIONS.stream().map(ext -> knowledge.templatesDir().resolve(n + ext)).toList();
     }
 
     private Set<String> existingTemplates() {
         Path dir = knowledge.templatesDir();
         if (!Files.isDirectory(dir)) return Set.of();
         try (var s = Files.list(dir)) {
-            return s.map(p -> p.getFileName().toString()).filter(n -> n.endsWith(".yaml") || n.endsWith(".yml")).map(n -> n.replaceAll("\\.ya?ml$", "")).collect(Collectors.toSet());
+            return s.map(p -> p.getFileName().toString()).filter(n -> n.matches(".*\\.(json|ya?ml)$")).map(n -> n.replaceAll("\\.(json|ya?ml)$", "")).collect(Collectors.toSet());
         } catch (IOException e) { return Set.of(); }
     }
 
@@ -304,16 +315,5 @@ public class HistoryService {
     static String slug(String s) {
         String x = s == null ? "" : s.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("(^-+|-+$)", "");
         return x.length() > 60 ? x.substring(0, 60).replaceAll("-+$", "") : x;
-    }
-
-    private static Yaml yaml() {
-        DumperOptions o = new DumperOptions();
-        o.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-        o.setPrettyFlow(true);
-        o.setIndent(2);
-        o.setAllowUnicode(true);
-        o.setWidth(4096);          // never wrap a title pattern or a hint across lines
-        o.setSplitLines(false);
-        return new Yaml(o);
     }
 }

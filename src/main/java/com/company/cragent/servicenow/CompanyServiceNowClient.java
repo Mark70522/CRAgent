@@ -45,7 +45,7 @@ public class CompanyServiceNowClient implements ServiceNowClient {
     @Override
     public ChangeRecord createChange(ChangeDraft draft) {
         // TODO 2/3: create a change request. draft.fields() and draft.tasks() carry exactly the names your
-        // templates use (knowledge/templates/*.yaml), so you can send them as they are or wrap them:
+        // templates use (knowledge/templates/*.json), so you can send them as they are or wrap them:
         //   Map<String, Object> body = new LinkedHashMap<>(draft.fields());
         //   body.put("tasks", draft.tasks());                      // or a separate call per task
         //   JsonNode resp = http.post("/change", body);

@@ -31,13 +31,30 @@ public class TemplateService {
 
     public TemplateService(Path templatesDir) { this.templatesDir = templatesDir; }
 
+    /** Templates are <name>.json; an old <name>.yaml / .yml is still read until it is saved again as JSON. */
+    public static final List<String> EXTENSIONS = List.of(".json", ".yaml", ".yml");
+
     public List<ChangeTemplate> listTemplates() {
         if (!Files.isDirectory(templatesDir)) return List.of();
+        Map<String, Path> byName = new java.util.TreeMap<>();
         try (Stream<Path> files = Files.list(templatesDir)) {
-            return files.filter(p -> p.toString().endsWith(".yaml") || p.toString().endsWith(".yml")).sorted().map(this::load).toList();
+            files.forEach(p -> {
+                String fn = p.getFileName().toString();
+                for (String ext : EXTENSIONS)
+                    if (fn.endsWith(ext)) { byName.merge(fn.substring(0, fn.length() - ext.length()), p, (a, b) -> a.toString().endsWith(".json") ? a : b); break; }
+            });
         } catch (IOException e) {
             throw new IllegalStateException("Cannot list " + templatesDir, e);
         }
+        return byName.values().stream().map(this::load).toList();
+    }
+
+    /** A template file as a map, whichever of the formats it is in. */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> readMap(Path file) throws IOException {
+        if (file.toString().endsWith(".json"))
+            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(Files.readString(file, java.nio.charset.StandardCharsets.UTF_8), Map.class);
+        try (InputStream in = Files.newInputStream(file)) { return new Yaml().load(in); }
     }
 
     public ChangeTemplate getTemplate(String name) {
@@ -112,8 +129,8 @@ public class TemplateService {
 
     @SuppressWarnings("unchecked")
     ChangeTemplate load(Path file) {
-        try (InputStream in = Files.newInputStream(file)) {
-            Map<String, Object> m = new Yaml().load(in);
+        try {
+            Map<String, Object> m = readMap(file);
             List<ChangeTemplate.TaskTemplate> tasks = new ArrayList<>();
             if (m.get("tasks") instanceof List<?> l) {
                 for (Object o : l) {

@@ -5,7 +5,7 @@ import java.util.Map;
 
 /**
  * One file under knowledge/templates/. Field names in {@code fields} and in the task entries are whatever your
- * ServiceNow interface expects; the program never renames them. See os-patch.yaml for the format.
+ * ServiceNow interface expects; the program never renames them. See knowledge/templates/os-patch.json for the format.
  */
 public record ChangeTemplate(
         String name,

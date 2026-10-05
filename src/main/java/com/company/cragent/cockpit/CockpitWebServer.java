@@ -212,8 +212,8 @@ public class CockpitWebServer {
                 if (p.size() == 2 && id.equals("template") && m.equals("POST")) return history.templateFromGroup(b.path("groupKey").asText(), b.path("name").asText(null));
             }
             case "template-files" -> {
-                if (p.size() == 2 && m.equals("GET")) return Map.of("name", id, "yaml", history.readTemplate(id));
-                if (p.size() == 2 && m.equals("PUT")) return history.writeTemplate(id, b.path("yaml").asText(""));
+                if (p.size() == 2 && m.equals("GET")) return Map.of("name", id, "json", history.readTemplate(id));
+                if (p.size() == 2 && m.equals("PUT")) return history.writeTemplate(id, b.path("json").isTextual() ? b.path("json").asText() : b.path("json").toPrettyString());
                 if (p.size() == 2 && m.equals("DELETE")) return Map.of("deleted", history.deleteTemplate(id));
             }
             // ---- daily cockpit (same files the MCP tools use)

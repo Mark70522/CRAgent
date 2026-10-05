@@ -36,7 +36,7 @@ public class HistoryTools {
     public List<HistoryService.Group> historyGroups() { return history.groups(); }
 
     @Tool(name = "save_template_from_history", description = """
-            Write knowledge/templates/<name>.yaml from one history group: agreed field values as defaults, the title
+            Write knowledge/templates/<name>.json from one history group: agreed field values as defaults, the title
             pattern with {ci_list} / {summary}, the latest example's tasks (with durations) and description headings.
             Show the user the group first; they confirm the name. The file is editable afterwards.""")
     public Map<String, Object> saveTemplate(

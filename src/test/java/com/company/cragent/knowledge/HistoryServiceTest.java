@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Import exported records, group them by service + title pattern, write a template from a group. */
 class HistoryServiceTest {
@@ -85,9 +86,10 @@ class HistoryServiceTest {
         Map<String, Object> t = history.templateFromGroup(patch.key(), null);
         Path file = Path.of(String.valueOf(t.get("file")));
         assertThat(file).exists();
-        String yaml = Files.readString(file);
-        assertThat(yaml).contains("name: order-portal-patch-x-date-windows-monthly-security-patches").contains("assignment_group: Wintel Ops")
-                .contains("short_description_pattern:").contains("{ci_list} - {summary} windows monthly security patches").contains("duration_minutes: 120").contains("heading: 影响范围");
+        assertThat(file.getFileName().toString()).endsWith(".json");
+        String text = Files.readString(file);
+        assertThat(text).contains("\"name\" : \"order-portal-patch-x-date-windows-monthly-security-patches\"").contains("\"assignment_group\" : \"Wintel Ops\"")
+                .contains("\"short_description_pattern\"").contains("{ci_list} - {summary} windows monthly security patches").contains("\"duration_minutes\" : 120").contains("\"heading\" : \"影响范围\"");
 
         // the template loads through the real TemplateService, i.e. create-cr can use it right away
         TemplateService ts = new TemplateService(knowledge.templatesDir());
@@ -97,9 +99,21 @@ class HistoryServiceTest {
 
         String tn = String.valueOf(t.get("name"));
         // editing round-trip
-        String edited = history.readTemplate(tn).replace("risk: Moderate", "risk: Low");
+        String edited = history.readTemplate(tn).replace("\"risk\" : \"Moderate\"", "\"risk\" : \"Low\"");
         history.writeTemplate(tn, edited);
-        assertThat(history.readTemplate(tn)).contains("risk: Low");
+        assertThat(history.readTemplate(tn)).contains("\"risk\" : \"Low\"");
+        assertThatThrownBy(() -> history.writeTemplate(tn, "name: not json")).isInstanceOf(IllegalArgumentException.class);
         assertThat(history.deleteTemplate(tn)).isTrue();
+
+        // an old YAML template still loads, opens as JSON, and saving it replaces the .yaml with a .json
+        Path old = knowledge.templatesDir().resolve("legacy.yaml");
+        Files.writeString(old, "name: legacy\nfields:\n  risk: Low\ntasks:\n  - short_description: Do it\n    duration_minutes: 15\n");
+        assertThat(ts.getTemplate("legacy").tasks()).hasSize(1);
+        String asJson = history.readTemplate("legacy");
+        assertThat(asJson).contains("\"risk\" : \"Low\"");
+        history.writeTemplate("legacy", asJson);
+        assertThat(old).doesNotExist();
+        assertThat(knowledge.templatesDir().resolve("legacy.json")).exists();
+        assertThat(ts.listTemplates()).extracting(x -> x.name()).containsOnlyOnce("legacy");
     }
 }
