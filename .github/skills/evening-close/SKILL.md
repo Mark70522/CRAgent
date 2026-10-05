@@ -12,7 +12,8 @@ Goal: nothing learned today is lost, and tomorrow starts pre-planned.
 1. `get_day` (today). Check the plan tasks: which are done. Ask about any planned task with no
    status change ("T-0012 做了吗?") and `update_task` accordingly: done / still open / dropped /
    **waiting** (waitingOn=... when it is now blocked on approval, a reply or a window).
-   Ask for actual time only if the user mentions it; never nag.
+   For tasks done today without `spent`, ask once, all in one line: "今天做完的 T-0012、T-0015 各花了多久?
+   (不记得就跳过)" - actual times are what makes estimates learnable. Never ask twice.
 2. A task marked done that has a `cr`: ask once whether the change request is closed too. If not,
    keep the task open as waiting (waitingOn="关 CHG...") instead of done.
 3. A task marked done that has `repeat`: propose the next occurrence (same title, next month / week /
@@ -38,6 +39,8 @@ Goal: nothing learned today is lost, and tomorrow starts pre-planned.
    decline stays in the day log only and is never proposed again (it will be a duplicate).
 4. If a pitfall changes how a template or rule should be (e.g. the os-patch task order), say so and
    offer to change `knowledge/templates/*.json` or add a rule via the learn-rules skill.
+5. A kept pitfall or lesson belongs to a task with a `kind` that has a playbook: offer to add it to the
+   playbook too (`get_playbook`, merge the one line into its "坑" or "步骤" section, `save_playbook` on yes).
 
 ## 3. Tomorrow
 
@@ -48,4 +51,5 @@ candidates. Keep it to ids and titles; the morning brief will do the reasoning.
 ## 4. Close
 
 `close_day` with the one-line summary and the tomorrow ids. Reply with: the summary, how many
-notes were kept and into which topics, and tomorrow's first item. Then stop - no pep talk.
+notes were kept and into which topics, and tomorrow's first item. On a Friday (or the last workday of
+the week) add one line: "要做本周复盘吗?" - yes runs the review skill. Then stop - no pep talk.

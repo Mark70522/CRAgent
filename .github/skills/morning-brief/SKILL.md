@@ -27,7 +27,10 @@ For each, write one line of *why* in the user's own history ("上次这台机器
 - reasons come from the notes and knowledge, never invented. If there is nothing in the history, say so plainly.
 
 Estimate the day: sum the est of the three (an `estBy=ai` estimate is a guess; say so); mention if it
-exceeds a realistic 5-6 working hours.
+exceeds a realistic 5-6 working hours. Correct with the history in `get_day.kinds`: a task without est
+gets the kind's `typicalMinutes`; when the kind's `estRatio` ≥ 1.25, say "按你以往,这类要多花 X%" and
+use the corrected time for the day's total. For each of the three whose kind has `playbook: true`,
+`get_playbook` and add the one step or pitfall that matters today to its why-line.
 
 **Watch list** - from `attention`, not part of the three, never nagged as "to do":
 - `overdueRun`: the scheduled time has passed and the task is still open. Ask: did it run? If yes →

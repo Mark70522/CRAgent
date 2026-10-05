@@ -24,6 +24,8 @@ public final class CockpitModel {
         public String due;            // yyyy-MM-dd : when it must be finished
         public String scheduledAt;    // yyyy-MM-dd HH:mm : when the work actually runs (a maintenance window), if different
         public String waitingOn;      // what a waiting task waits for: approval, a reply, a window
+        public String waitingSince;   // yyyy-MM-dd it started waiting (set / cleared with the status)
+        public String kind;           // what sort of work this is (os-patch, oracle-ru, weekly-report ...): reviews and playbooks group by it
         public String cr;             // linked change request number (CHG...), set by create_change or the user
         public String ice;            // the CR's ICE record id, set by create_ice
         public String repeat;         // monthly | weekly | quarterly | free text : recurring work, next one is created when this is done
@@ -107,6 +109,48 @@ public final class CockpitModel {
 
     public static class Stats {
         public List<DayStat> days = new ArrayList<>();
+    }
+
+    /** What the history says about one kind of work: how long it takes, how far off the estimates are, how often it comes back. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class KindStat {
+        public String kind;
+        public int done;                       // all time
+        public int open;
+        public int doneInPeriod;
+        public Integer typicalMinutes;         // median actual time (spent), else median estimate
+        public Double estRatio;                // median spent / est over tasks that have both: 1.4 = takes 40% longer than estimated
+        public int ratioSamples;
+        public Double avgCarried;              // average days a task of this kind slipped
+        public Integer everyDays;              // it comes back about every N days (3+ occurrences, regular)
+        public String lastDone;
+        public String nextExpected;
+        public boolean repeatSet;              // an open task of this kind already has repeat
+        public List<String> pitfalls = new ArrayList<>();   // distinct, newest first
+        public List<String> knowledge = new ArrayList<>();  // titles of knowledge entries that came out of tasks of this kind
+        public boolean playbook;
+        public String playbookUpdated;
+        public List<String> tasks = new ArrayList<>();      // "T-0012 title" done in the period
+    }
+
+    /** A period looked back on: numbers, per-kind patterns and concrete suggestions (all computed, no guessing). */
+    public static class Review {
+        public String from;
+        public String to;
+        public int created;
+        public int done;
+        public int dropped;
+        public int openNow;
+        public int plannedTasks;               // sum over the closed days in the period
+        public int plannedDone;
+        public Integer completionPct;
+        public Double estRatio;                // over all tasks done in the period with est and spent
+        public int ratioSamples;
+        public List<KindStat> kinds = new ArrayList<>();
+        public List<Map<String, Object>> stuck = new ArrayList<>();        // waiting long or carried often
+        public List<Map<String, Object>> missingSpent = new ArrayList<>(); // done in the period without an actual time
+        public List<Map<String, Object>> unclassified = new ArrayList<>(); // tasks of the period without a kind
+        public List<Map<String, Object>> suggestions = new ArrayList<>();  // {type, kind?, text, ...}
     }
 
     /** One "## title (date)" section of a knowledge file. */

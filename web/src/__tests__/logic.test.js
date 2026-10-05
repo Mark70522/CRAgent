@@ -2,6 +2,18 @@ import { describe, expect, it } from 'vitest'
 import { guessType, same, toPayload } from '../components/fieldTypes'
 import { moveRow, reflowTimes, renumber } from '../components/tasksLogic'
 import { placeInPlan, removeFromPlan, taskChanges } from '../features/cockpit/planLogic'
+import { kindLine } from '../features/cockpit/cockpitApi'
+
+describe('kindLine: what the history says about a kind, in one line', () => {
+  it('shows time, estimate bias, recurrence', () => {
+    expect(kindLine({ typicalMinutes: 90, estRatio: 1.5, ratioSamples: 3, everyDays: 30, done: 3 }))
+      .toBe('通常 1.5h · 预计偏低 50%(3 次) · 约每 30 天一次 · 做过 3 次')
+  })
+  it('leaves out a bias that is small or from one sample', () => {
+    expect(kindLine({ typicalMinutes: 30, estRatio: 1.1, ratioSamples: 5, done: 5 })).toBe('通常 30m · 做过 5 次')
+    expect(kindLine({ estRatio: 2, ratioSamples: 1, done: 1 })).toBe('做过 1 次')
+  })
+})
 
 describe('guessType: a field not in the catalog is shown by its value (same rules as the server)', () => {
   it.each([

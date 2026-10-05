@@ -60,7 +60,7 @@ public class CockpitStore {
      * Result of add: which were created, which merged into an existing task, and for each created task the
      * past tasks that look like it (last time's cost and pitfalls) so Copilot can mention them right away.
      */
-    public record AddResult(List<Task> created, List<Task> merged, List<Related> related) {}
+    public record AddResult(List<Task> created, List<Task> merged, List<Related> related, List<Map<String, Object>> history) {}
 
     public synchronized AddResult addTasks(List<Task> incoming, String source) { return DirLock.with(props.dir(), () -> {
         List<Task> all = tasks();
@@ -77,6 +77,7 @@ public class CockpitStore {
                 if (in.cr != null && dup.cr == null) dup.cr = in.cr;
                 if (in.repeat != null && dup.repeat == null) dup.repeat = in.repeat;
                 if (in.priority != null && "P1".equals(in.priority)) dup.priority = "P1";
+                if (blankToNull(in.kind) != null && dup.kind == null) dup.kind = normKind(in.kind);
                 if (in.context != null && !in.context.isBlank()) appendTaskNote(dup.id, "补充(" + now + "):" + in.context);
                 dup.updatedAt = now;
                 merged.add(dup);
@@ -95,6 +96,7 @@ public class CockpitStore {
             t.repeat = in.repeat;
             t.context = in.context;
             t.tags = in.tags == null ? new ArrayList<>() : in.tags;
+            t.kind = blankToNull(in.kind) == null ? null : normKind(in.kind);
             t.createdAt = now;
             t.updatedAt = now;
             all.add(t);
@@ -103,7 +105,18 @@ public class CockpitStore {
             related.addAll(relatedPast(t, all));
         }
         write(props.backlog(), all);
-        return new AddResult(created, merged, related);
+        // what the history says about each new task's kind: typical time, estimate bias, playbook
+        List<Map<String, Object>> history = new ArrayList<>();
+        Map<String, KindStat> stats = kindStats(all, null, null);
+        for (Task t : created) {
+            String k = kindOf(t);
+            KindStat ks = k == null ? null : stats.get(k);
+            if (ks == null || (ks.done == 0 && !ks.playbook)) continue;
+            Map<String, Object> h = hint(ks);
+            h.put("forTask", t.id);
+            history.add(h);
+        }
+        return new AddResult(created, merged, related, history);
     }); }
 
     /** Finished tasks that look like this one, newest first, with the pitfall / learned lines from their notes. */
@@ -166,15 +179,21 @@ public class CockpitStore {
                     if (!Set.of("todo", "doing", "waiting", "done", "dropped").contains(v)) throw new IllegalArgumentException("Unknown status " + v);
                     t.status = v;
                     if ("done".equals(v)) t.doneAt = now(); else t.doneAt = null;
-                    if (!"waiting".equals(v)) t.waitingOn = null;
+                    if (!"waiting".equals(v)) { t.waitingOn = null; t.waitingSince = null; }
+                    else if (t.waitingSince == null) t.waitingSince = today();
                 }
+                case "kind" -> t.kind = blankToNull(v) == null ? null : normKind(v);
                 case "priority" -> t.priority = v;
                 case "est" -> { t.est = v == null || v.isBlank() ? null : Integer.parseInt(v.trim()); if (t.est != null && t.estBy == null) t.estBy = "user"; }
                 case "estBy" -> t.estBy = blankToNull(v);
                 case "spent" -> t.spent = v == null || v.isBlank() ? null : Integer.parseInt(v.trim());
                 case "due" -> t.due = blankToNull(v);
                 case "scheduledAt", "scheduled" -> t.scheduledAt = blankToNull(v);
-                case "waitingOn" -> { t.waitingOn = blankToNull(v); if (t.waitingOn != null && t.isActionable()) t.status = "waiting"; }
+                case "waitingOn" -> {
+                    t.waitingOn = blankToNull(v);
+                    if (t.waitingOn != null && t.isActionable()) t.status = "waiting";
+                    if ("waiting".equals(t.status) && t.waitingSince == null) t.waitingSince = today();
+                }
                 case "cr" -> t.cr = blankToNull(v);
                 case "ice" -> t.ice = blankToNull(v);
                 case "repeat" -> t.repeat = blankToNull(v);
@@ -522,6 +541,248 @@ public class CockpitStore {
         return h.knowledge.stream().anyMatch(e -> contains(e.title, q) || contains(e.content, q) || contains(e.topic, q));
     }
     private static boolean contains(String s, String q) { return s != null && s.toLowerCase().contains(q); }
+
+    // ------------------------------------------------------------------ review: learning from what was done
+
+    /** The kind a task is grouped under: its own kind, else its first tag, else null (unclassified). */
+    public static String kindOf(Task t) {
+        if (t.kind != null && !t.kind.isBlank()) return normKind(t.kind);
+        if (t.tags != null) for (String g : t.tags) if (g != null && !g.isBlank()) return normKind(g);
+        return null;
+    }
+
+    static String normKind(String k) { return k.trim().toLowerCase().replaceAll("\\s+", "-"); }
+
+    /** Every kind in use (tasks and playbooks), most used first. */
+    public synchronized List<String> kinds() { return DirLock.with(props.dir(), () -> {
+        Map<String, Integer> n = new HashMap<>();
+        for (Task t : tasks()) { String k = kindOf(t); if (k != null) n.merge(k, 1, Integer::sum); }
+        for (Map<String, Object> p : playbooks()) n.putIfAbsent(String.valueOf(p.get("kind")), 0);
+        return n.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
+                .map(Map.Entry::getKey).collect(Collectors.toList());
+    }); }
+
+    /** What to expect from one kind, in short: for add_tasks and get_day. */
+    static Map<String, Object> hint(KindStat k) {
+        Map<String, Object> h = new LinkedHashMap<>();
+        h.put("kind", k.kind);
+        h.put("done", k.done);
+        if (k.typicalMinutes != null) h.put("typicalMinutes", k.typicalMinutes);
+        if (k.estRatio != null) { h.put("estRatio", k.estRatio); h.put("ratioSamples", k.ratioSamples); }
+        if (k.everyDays != null) { h.put("everyDays", k.everyDays); h.put("nextExpected", k.nextExpected); }
+        if (!k.pitfalls.isEmpty()) h.put("pitfalls", k.pitfalls.subList(0, Math.min(3, k.pitfalls.size())));
+        h.put("playbook", k.playbook);
+        return h;
+    }
+
+    /** Short hints for the kinds of the given tasks (only kinds with some history). */
+    public synchronized Map<String, Map<String, Object>> hints(Collection<Task> forTasks) { return DirLock.with(props.dir(), () -> {
+        Map<String, KindStat> all = kindStats(tasks(), null, null);
+        Map<String, Map<String, Object>> out = new LinkedHashMap<>();
+        for (Task t : forTasks) {
+            String k = kindOf(t);
+            KindStat ks = k == null ? null : all.get(k);
+            if (ks != null && (ks.done > 0 || ks.playbook) && !out.containsKey(k)) out.put(k, hint(ks));
+        }
+        return out;
+    }); }
+
+    private static final Pattern PITFALL = Pattern.compile("(?i).*(坑|教训|注意|pitfall|\\[pitfall]).*");
+    private static final Pattern NOTE_STAMP = Pattern.compile("^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}\\s*|\\d{2}:\\d{2}\\s*)");
+
+    /**
+     * Per kind, over all tasks: counts, typical time, estimate bias, slips, recurrence, pitfalls, knowledge,
+     * playbook. from / to (yyyy-MM-dd, inclusive) only decide doneInPeriod and the task list.
+     */
+    Map<String, KindStat> kindStats(List<Task> all, String from, String to) {
+        Map<String, List<Task>> byKind = new TreeMap<>();
+        for (Task t : all) { String k = kindOf(t); if (k != null) byKind.computeIfAbsent(k, x -> new ArrayList<>()).add(t); }
+        Map<String, Map<String, Object>> books = new HashMap<>();
+        for (Map<String, Object> p : playbooks()) { books.put(String.valueOf(p.get("kind")), p); byKind.putIfAbsent(String.valueOf(p.get("kind")), new ArrayList<>()); }
+        Map<String, List<String>> knowledgeByTask = new HashMap<>();
+        for (KnowledgeEntry e : knowledgeEntries()) if (e.taskId != null) knowledgeByTask.computeIfAbsent(e.taskId, x -> new ArrayList<>()).add(e.title + " (" + e.topic + ")");
+
+        Map<String, KindStat> out = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Task>> en : byKind.entrySet()) {
+            KindStat k = new KindStat();
+            k.kind = en.getKey();
+            List<Task> ts = en.getValue();
+            List<Task> done = ts.stream().filter(t -> "done".equals(t.status)).collect(Collectors.toList());
+            k.done = done.size();
+            k.open = (int) ts.stream().filter(Task::isOpen).count();
+            for (Task t : done) if (inRange(dateOf(t.doneAt), from, to)) { k.doneInPeriod++; k.tasks.add(t.id + " " + t.title); }
+            Integer spentMedian = median(done.stream().map(t -> t.spent).filter(x -> x != null && x > 0).map(Integer::doubleValue).collect(Collectors.toList()));
+            Integer estMedian = median(ts.stream().map(t -> t.est).filter(x -> x != null && x > 0).map(Integer::doubleValue).collect(Collectors.toList()));
+            k.typicalMinutes = spentMedian != null ? spentMedian : estMedian;
+            List<Double> ratios = done.stream().filter(t -> t.est != null && t.est > 0 && t.spent != null && t.spent > 0)
+                    .map(t -> (double) t.spent / t.est).collect(Collectors.toList());
+            k.ratioSamples = ratios.size();
+            if (!ratios.isEmpty()) k.estRatio = Math.round(medianD(ratios) * 100) / 100.0;
+            double carried = ts.stream().mapToInt(t -> t.carried).average().orElse(0);
+            if (carried > 0) k.avgCarried = Math.round(carried * 10) / 10.0;
+            recurrence(k, done.stream().map(t -> dateOf(t.doneAt)).filter(Objects::nonNull).sorted().collect(Collectors.toList()));
+            k.repeatSet = ts.stream().anyMatch(t -> t.isOpen() && t.repeat != null && !t.repeat.isBlank());
+            // pitfalls from the tasks' own notes, newest task first
+            Set<String> seen = new LinkedHashSet<>();
+            ts.stream().sorted(Comparator.comparing((Task t) -> t.updatedAt == null ? "" : t.updatedAt).reversed()).forEach(t -> {
+                for (String line : taskNotes(t.id).split("\n")) {
+                    String l = line.startsWith("- ") ? line.substring(2).trim() : line.trim();
+                    if (l.startsWith("#") || l.isEmpty() || !PITFALL.matcher(l).matches()) continue;
+                    seen.add(NOTE_STAMP.matcher(l).replaceFirst(""));
+                }
+                for (String kn : knowledgeByTask.getOrDefault(t.id, List.of())) if (!k.knowledge.contains(kn)) k.knowledge.add(kn);
+            });
+            k.pitfalls.addAll(seen.stream().limit(8).collect(Collectors.toList()));
+            Map<String, Object> book = books.get(k.kind);
+            k.playbook = book != null;
+            if (book != null) k.playbookUpdated = String.valueOf(book.get("updated"));
+            out.put(k.kind, k);
+        }
+        return out;
+    }
+
+    /** 3+ occurrences at regular intervals: "about every N days", next one expected after the last. */
+    static void recurrence(KindStat k, List<String> doneDays) {
+        if (doneDays.isEmpty()) return;
+        k.lastDone = doneDays.get(doneDays.size() - 1);
+        if (doneDays.size() < 3) return;
+        List<Double> gaps = new ArrayList<>();
+        for (int i = 1; i < doneDays.size(); i++)
+            gaps.add((double) java.time.temporal.ChronoUnit.DAYS.between(LocalDate.parse(doneDays.get(i - 1)), LocalDate.parse(doneDays.get(i))));
+        double m = medianD(gaps);
+        if (m < 3 || m > 120) return;
+        boolean regular = gaps.stream().allMatch(g -> g >= m * 0.5 && g <= m * 1.6);
+        if (!regular) return;
+        k.everyDays = (int) Math.round(m);
+        k.nextExpected = LocalDate.parse(k.lastDone).plusDays(k.everyDays).toString();
+    }
+
+    /** A period looked back on. Defaults: the 7 days up to today. */
+    public synchronized Review review(String from, String to) { return DirLock.with(props.dir(), () -> {
+        String t = blankToNull(to) == null ? today() : to.trim();
+        String f = blankToNull(from) == null ? LocalDate.parse(t).minusDays(6).toString() : from.trim();
+        List<Task> all = tasks();
+        Review r = new Review();
+        r.from = f; r.to = t;
+        List<Double> ratios = new ArrayList<>();
+        String today = today();
+        for (Task x : all) {
+            if (inRange(dateOf(x.createdAt), f, t)) r.created++;
+            boolean doneHere = "done".equals(x.status) && inRange(dateOf(x.doneAt), f, t);
+            if (doneHere) {
+                r.done++;
+                if (x.est != null && x.est > 0 && x.spent != null && x.spent > 0) ratios.add((double) x.spent / x.est);
+                if (x.spent == null) r.missingSpent.add(row(x, null));
+            }
+            if ("dropped".equals(x.status) && inRange(dateOf(x.updatedAt), f, t)) r.dropped++;
+            if (x.isOpen()) r.openNow++;
+            if (kindOf(x) == null && (doneHere || x.isOpen())) r.unclassified.add(row(x, null));
+            if ("waiting".equals(x.status) && x.waitingSince != null) {
+                long days = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.parse(x.waitingSince), LocalDate.parse(today));
+                if (days >= 5) r.stuck.add(row(x, "等 " + (x.waitingOn == null ? "…" : x.waitingOn) + " 已 " + days + " 天"));
+            } else if (x.isOpen() && x.carried >= 3) r.stuck.add(row(x, "已往后拖 " + x.carried + " 天"));
+        }
+        r.ratioSamples = ratios.size();
+        if (!ratios.isEmpty()) r.estRatio = Math.round(medianD(ratios) * 100) / 100.0;
+        for (DayStat s : stats().days) if (inRange(s.date, f, t)) { r.plannedTasks += s.planned; r.plannedDone += s.done; }
+        if (r.plannedTasks > 0) r.completionPct = (int) Math.round(100.0 * r.plannedDone / r.plannedTasks);
+
+        Map<String, KindStat> ks = kindStats(all, f, t);
+        r.kinds = ks.values().stream().filter(k -> k.done > 0 || k.open > 0 || k.playbook)
+                .sorted(Comparator.comparingInt((KindStat k) -> k.doneInPeriod).thenComparingInt(k -> k.done).reversed())
+                .collect(Collectors.toList());
+        for (KindStat k : r.kinds) {
+            if (k.estRatio != null && k.ratioSamples >= 3 && (k.estRatio >= 1.25 || k.estRatio <= 0.8))
+                r.suggestions.add(suggestion("estimate", k.kind, "「" + k.kind + "」实际用时是预计的 " + k.estRatio + " 倍(" + k.ratioSamples + " 次):以后预计按 " + k.estRatio + " 倍估"
+                        + (k.typicalMinutes == null ? "" : ",或直接按典型 " + k.typicalMinutes + " 分钟")));
+            if (k.everyDays != null && !k.repeatSet)
+                r.suggestions.add(suggestion("repeat", k.kind, "「" + k.kind + "」大约每 " + k.everyDays + " 天一次,下次约 " + k.nextExpected + ":设成周期任务,到时自动出现"));
+            if (k.done >= 3 && !k.playbook)
+                r.suggestions.add(suggestion("playbook", k.kind, "「" + k.kind + "」已做 " + k.done + " 次还没有标准做法:把步骤、用时、坑整理成 playbook"));
+            if (k.playbook && k.lastDone != null && k.playbookUpdated != null && k.lastDone.compareTo(k.playbookUpdated) > 0 && (!k.pitfalls.isEmpty() || !k.knowledge.isEmpty()))
+                r.suggestions.add(suggestion("playbook-update", k.kind, "「" + k.kind + "」的 playbook 更新于 " + k.playbookUpdated + ",之后又做过(最近 " + k.lastDone + "):把新的坑和经验并进去"));
+            if (k.pitfalls.size() >= 2)
+                r.suggestions.add(suggestion("pitfalls", k.kind, "「" + k.kind + "」记过 " + k.pitfalls.size() + " 条坑:反复出现的,做成 CR 规则或模板里的固定一步"));
+        }
+        if (!r.unclassified.isEmpty()) r.suggestions.add(suggestion("classify", null, r.unclassified.size() + " 个任务没有类型:补上才能归纳"));
+        if (!r.missingSpent.isEmpty()) r.suggestions.add(suggestion("spent", null, r.missingSpent.size() + " 个完成的任务没填实际用时:补上,估时才会越来越准"));
+        if (!r.stuck.isEmpty()) r.suggestions.add(suggestion("stuck", null, r.stuck.size() + " 个任务卡住了:催、改期,还是放弃?"));
+        return r;
+    }); }
+
+    private static Map<String, Object> row(Task t, String why) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", t.id);
+        m.put("title", t.title);
+        m.put("status", t.status);
+        if (kindOf(t) != null) m.put("kind", kindOf(t));
+        if (t.est != null) m.put("est", t.est);
+        if (why != null) m.put("why", why);
+        return m;
+    }
+
+    private static Map<String, Object> suggestion(String type, String kind, String text) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("type", type);
+        if (kind != null) m.put("kind", kind);
+        m.put("text", text);
+        return m;
+    }
+
+    private static String dateOf(String stamp) { return stamp == null || stamp.length() < 10 ? null : stamp.substring(0, 10); }
+    private static boolean inRange(String d, String from, String to) {
+        return d != null && (from == null || d.compareTo(from) >= 0) && (to == null || d.compareTo(to) <= 0);
+    }
+    private static Integer median(List<Double> xs) { return xs.isEmpty() ? null : (int) Math.round(medianD(xs)); }
+    private static double medianD(List<Double> xs) {
+        List<Double> s = new ArrayList<>(xs);
+        Collections.sort(s);
+        int n = s.size();
+        return n % 2 == 1 ? s.get(n / 2) : (s.get(n / 2 - 1) + s.get(n / 2)) / 2;
+    }
+
+    // ------------------------------------------------------------------ playbooks: the standard way of doing one kind of work
+
+    private Path playbookFile(String kind) { return props.playbooks().resolve(slug(normKind(kind)) + ".md"); }
+
+    public synchronized String playbook(String kind) { return DirLock.with(props.dir(), () -> {
+        Path f = playbookFile(kind);
+        return Files.exists(f) ? readString(f) : "";
+    }); }
+
+    /** Replace a kind's playbook; the previous version is kept under playbooks/history/. */
+    public synchronized Path savePlaybook(String kind, String content) { return DirLock.with(props.dir(), () -> {
+        String k = normKind(kind);
+        Path f = playbookFile(k);
+        String body = content.strip();
+        if (!body.startsWith("# ")) body = "# " + k + "\n\n" + body;
+        if (Files.exists(f)) {
+            Path old = props.playbooks().resolve("history").resolve(f.getFileName().toString().replace(".md", "") + "." + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + ".md");
+            Files.createDirectories(old.getParent());
+            Files.copy(f, old);
+        }
+        DirLock.writeAtomically(f, body + "\n");
+        return f;
+    }); }
+
+    /** {kind, file, updated (yyyy-MM-dd), lines} for every playbook. The kind is the file's first "# " line. */
+    public synchronized List<Map<String, Object>> playbooks() { return DirLock.with(props.dir(), () -> {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (!Files.isDirectory(props.playbooks())) return out;
+        try (Stream<Path> s = Files.list(props.playbooks())) {
+            for (Path p : s.filter(x -> x.toString().endsWith(".md")).sorted().collect(Collectors.toList())) {
+                String text = readString(p);
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("kind", text.lines().filter(l -> l.startsWith("# ")).findFirst().map(l -> normKind(l.substring(2))).orElse(p.getFileName().toString().replace(".md", "")));
+                m.put("file", "playbooks/" + p.getFileName());
+                m.put("updated", LocalDate.ofInstant(Files.getLastModifiedTime(p).toInstant(), java.time.ZoneId.systemDefault()).toString());
+                m.put("lines", (int) text.lines().count());
+                out.add(m);
+            }
+        }
+        return out;
+    }); }
 
     // ------------------------------------------------------------------ helpers
 

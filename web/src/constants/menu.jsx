@@ -1,6 +1,6 @@
 import {
   AppstoreOutlined, BulbOutlined, CalendarOutlined, CheckSquareOutlined, DashboardOutlined, DatabaseOutlined,
-  EditOutlined, FileTextOutlined, FormOutlined, HistoryOutlined, LineChartOutlined, PlusCircleOutlined,
+  EditOutlined, FileTextOutlined, FormOutlined, HistoryOutlined, LineChartOutlined, PlusCircleOutlined, RiseOutlined,
   SafetyCertificateOutlined, SyncOutlined,
 } from '@ant-design/icons'
 
@@ -13,6 +13,7 @@ export const menuItems = [
       { key: '/today', icon: <CalendarOutlined />, label: '今天' },
       { key: '/todos', icon: <CheckSquareOutlined />, label: '任务' },
       { key: '/knowledge', icon: <BulbOutlined />, label: '知识沉淀' },
+      { key: '/review', icon: <RiseOutlined />, label: '复盘' },
     ],
   },
   {

@@ -16,4 +16,5 @@ public record CockpitProperties(Path dir, Integer port, Boolean web) {
     public Path knowledge(){ return dir().resolve("knowledge"); }
     public Path stats()    { return dir().resolve("stats.json"); }
     public Path records()  { return dir().resolve("records"); }
+    public Path playbooks(){ return dir().resolve("playbooks"); }
 }

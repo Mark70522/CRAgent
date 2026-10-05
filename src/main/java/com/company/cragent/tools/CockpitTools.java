@@ -31,6 +31,7 @@ public class CockpitTools {
     /** One task as Copilot extracts it from pasted text. */
     public record TaskInput(
             String title,
+            @ToolParam(description = "Kind of work, reuse a known one (os-patch, oracle-ru …)", required = false) String kind,
             @ToolParam(description = "Minutes, only if the user said so", required = false) Integer est,
             @ToolParam(description = "yyyy-MM-dd, must be done by", required = false) String due,
             @ToolParam(description = "yyyy-MM-dd HH:mm, when the work runs", required = false) String scheduledAt,
@@ -42,7 +43,7 @@ public class CockpitTools {
 
     public record SlotInput(String time, String label, @ToolParam(required = false) Integer minutes, @ToolParam(required = false) String taskId) {}
 
-    @Tool(name = "add_tasks", description = "Add tasks taken from pasted text. Near-duplicates of open tasks are merged. Returns created, mergedInto and related (similar finished tasks with their cost and pitfalls).")
+    @Tool(name = "add_tasks", description = "Add tasks taken from pasted text. Near-duplicates are merged. Returns created, mergedInto, related (similar past tasks), history (per kind: typical minutes, estimate bias, pitfalls, playbook) and knownKinds.")
     public Map<String, Object> addTasks(
             List<TaskInput> tasks,
             @ToolParam(description = "paste|email|meeting|chat", required = false) String source) {
@@ -50,7 +51,7 @@ public class CockpitTools {
         for (TaskInput ti : tasks) {
             Task t = new Task();
             t.title = ti.title(); t.est = ti.est(); t.due = ti.due(); t.priority = ti.priority(); t.context = ti.context();
-            t.scheduledAt = ti.scheduledAt(); t.cr = ti.cr(); t.repeat = ti.repeat();
+            t.scheduledAt = ti.scheduledAt(); t.cr = ti.cr(); t.repeat = ti.repeat(); t.kind = ti.kind();
             t.tags = ti.tags() == null ? new ArrayList<>() : ti.tags();
             in.add(t);
         }
@@ -59,6 +60,8 @@ public class CockpitTools {
         out.put("created", r.created());
         out.put("mergedInto", r.merged());
         out.put("related", r.related());
+        out.put("history", r.history());
+        out.put("knownKinds", store.kinds());
         return out;
     }
 
@@ -74,7 +77,7 @@ public class CockpitTools {
     }
 
     @Tool(name = "update_task", description = """
-            Change task fields: title, status (todo|doing|waiting|done|dropped), waitingOn (sets waiting), priority,
+            Change task fields: title, kind, status (todo|doing|waiting|done|dropped), waitingOn (sets waiting), priority,
             est, estBy (user|ai), spent (minutes), due, scheduledAt, cr, ice, repeat, context, tags (comma separated).""")
     public Task updateTask(
             @ToolParam(description = "T-0003") String id,
@@ -89,7 +92,7 @@ public class CockpitTools {
         return n.isEmpty() ? "(no notes yet for " + id + ")" : n;
     }
 
-    @Tool(name = "get_day", description = "The day: plan, notes, carried-over and open tasks, attention (waiting, scheduled, overdueRun, dueSoon, withChange), recent stats, knowledge topics, previous day.")
+    @Tool(name = "get_day", description = "The day: plan, notes, carried-over and open tasks, attention (waiting, scheduled, overdueRun, dueSoon, withChange), kinds (history per kind of the open tasks), recent stats, knowledge topics, previous day.")
     public Map<String, Object> getDay(@ToolParam(description = "yyyy-MM-dd, default today", required = false) String date) {
         Day day = store.day(date);
         Map<String, Task> byId = store.tasks().stream().collect(Collectors.toMap(t -> t.id, t -> t, (a, b) -> a, LinkedHashMap::new));
@@ -99,6 +102,7 @@ public class CockpitTools {
         out.put("carryOver", store.carryOver(day.date));
         out.put("openTasks", byId.values().stream().filter(t -> t.isOpen()).collect(Collectors.toList()));
         out.put("attention", store.attention(day.date));
+        out.put("kinds", store.hints(byId.values().stream().filter(Task::isOpen).collect(Collectors.toList())));
         List<DayStat> stats = store.stats().days;
         out.put("recentStats", stats.subList(Math.max(0, stats.size() - 7), stats.size()));
         out.put("knowledgeTopics", store.knowledgeCards());
@@ -204,6 +208,28 @@ public class CockpitTools {
             @ToolParam(description = "created|done|updated", required = false) String sort,
             @ToolParam(description = "default 30", required = false) Integer limit) {
         return store.history(query, status, from, to, sort, limit == null ? 30 : limit);
+    }
+
+    @Tool(name = "review", description = """
+            Look back on a period (default the last 7 days): done/created/dropped, plan completion, estimate bias,
+            per kind (typical minutes, estRatio, recurrence, pitfalls, knowledge, playbook), stuck tasks, done tasks
+            without spent, unclassified tasks, and computed suggestions.""")
+    public Review review(
+            @ToolParam(description = "yyyy-MM-dd", required = false) String from,
+            @ToolParam(description = "yyyy-MM-dd, default today", required = false) String to) {
+        return store.review(from, to);
+    }
+
+    @Tool(name = "get_playbook", description = "The standard way of doing one kind of work (steps, typical time, checks, pitfalls). Empty when none yet.")
+    public String getPlaybook(String kind) {
+        String p = store.playbook(kind);
+        return p.isEmpty() ? "(no playbook for " + kind + " yet; known: " + store.playbooks().stream().map(m -> String.valueOf(m.get("kind"))).toList() + ")" : p;
+    }
+
+    @Tool(name = "save_playbook", description = "Write a kind's playbook (whole markdown, replaces it; the old version is kept). Only after the user agreed.")
+    public Map<String, Object> savePlaybook(String kind, @ToolParam(description = "Markdown") String content) {
+        var f = store.savePlaybook(kind, content);
+        return Map.of("kind", kind, "file", store.dir().relativize(f).toString().replace('\\', '/'));
     }
 
     @Tool(name = "cockpit_url", description = "Address of the web page.")

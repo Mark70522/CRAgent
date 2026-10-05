@@ -258,6 +258,20 @@ public class CockpitWebServer {
                 if (p.size() == 2 && m.equals("GET")) return Map.of("topic", id, "text", store.readKnowledge(id));
             }
             case "search" -> { if (p.size() == 1 && m.equals("GET")) return store.search(q.getOrDefault("q", ""), 30); }
+            // ---- learning from what was done: review, kinds, playbooks
+            case "review" -> { if (p.size() == 1 && m.equals("GET")) return store.review(q.get("from"), q.get("to")); }
+            case "kinds" -> {
+                if (p.size() == 1 && m.equals("GET")) return store.kinds();
+                if (p.size() == 2 && m.equals("GET")) {
+                    Task probe = new Task(); probe.kind = id;
+                    return store.hints(List.of(probe)).values().stream().findFirst().orElse(Map.of("kind", id, "done", 0, "playbook", false));
+                }
+            }
+            case "playbooks" -> {
+                if (p.size() == 1 && m.equals("GET")) return store.playbooks();
+                if (p.size() == 2 && m.equals("GET")) return Map.of("kind", id, "content", store.playbook(id));
+                if (p.size() == 2 && m.equals("PUT")) return Map.of("kind", id, "file", store.dir().relativize(store.savePlaybook(id, b.path("content").asText(""))).toString().replace('\\', '/'));
+            }
             default -> { }
         }
         throw new NoSuchElementException("no route " + m + " /api/v1" + path);

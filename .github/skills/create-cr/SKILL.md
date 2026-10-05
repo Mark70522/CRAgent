@@ -32,7 +32,10 @@ as the default start time; if the task has a `cr` already, say so and stop - rev
 3. `list_templates` → pick by keywords and by the service name (templates made from history carry the
    service in their name and description); none fits → `history_groups`: if a group for this service and
    kind of change exists, offer `save_template_from_history` first, else say so and offer the closest.
-4. `list_examples` → read one or two archived examples of the same category (`read_example`) and use their
+4. If the work's kind has a playbook (`get_playbook` with the kind / template name; the matching cockpit
+   task's `kind` when there is one), read it: its steps become the tasks, its 坑 go into the risk and
+   backout sections, its 用时 sets the durations.
+5. `list_examples` → read one or two archived examples of the same category (`read_example`) and use their
    wording, field values and task sequence as the reference. If the user names an earlier change,
    `get_change` it instead.
 

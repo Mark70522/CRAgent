@@ -25,11 +25,18 @@ Three jobs, all quick. Never make the user fill a form. Never invent a fact the 
    - `repeat` = monthly / weekly / quarterly when the text says 每月 / 每周 / 每季度 or it is obviously
      periodic work (monthly OS patching).
 4. Put the original wording and who asked into `context` - that is what the user will search for later.
-5. `add_tasks` with `source` = email / meeting / chat / paste. The result says:
+5. `kind`: the sort of work, short and lowercase (os-patch, oracle-ru, cab-meeting, 周报). **Reuse a
+   known kind** - `knownKinds` comes back with every add_tasks, and get_day.kinds lists the open ones;
+   invent a new one only when nothing fits. Same kind = the review can learn from it. Unsure → leave
+   it empty rather than guess.
+6. `add_tasks` with `source` = email / meeting / chat / paste. The result says:
    - `mergedInto`: tell the user in one line each ("和 T-0012 是同一件事,已合并").
    - `related`: finished tasks that look like a new one. For each, one line from the data:
      "上次 T-0007(9 月)花了 2.5h,CHG0012,坑:02 要等 01 验证完". Nothing from general knowledge.
-6. Reply with a compact list: id, title, scheduledAt or due, est (mark "AI 估" if you guessed). Nothing else.
+   - `history` (per kind): one line, from the data only - "这类事通常 1.5h,你以往预计偏低 50%;有标准做法".
+     When it has `playbook: true`, offer `get_playbook` once ("要看标准做法吗?"). When the user stated
+     no est, propose `typicalMinutes` (× estRatio if they always under-estimate) as an `estBy=ai` guess.
+7. Reply with a compact list: id, title, kind, scheduledAt or due, est (mark "AI 估" if you guessed). Nothing else.
 
 ## B. Quick note ("记一笔")
 
@@ -57,6 +64,7 @@ pass its `taskId` so it lands in that task's notes too. Reply with three words, 
 | "CR 是 CHG0012345" | cr=CHG0012345 |
 | "周日凌晨 1 点执行" | scheduledAt=yyyy-MM-dd 01:00 |
 | "这个每个月都有" | repeat=monthly |
+| "这是补丁类的" / "归到 oracle-ru" | kind=os-patch / kind=oracle-ru |
 
 Always echo what changed in one line. A task with `cr` is not done until the user says the CR is
 closed too - ask once when they mark it done.
