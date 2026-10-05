@@ -14,6 +14,9 @@ import TemplatesPage from '../features/history/TemplatesPage'
 import TodayPage from '../features/cockpit/TodayPage'
 import TodosPage from '../features/cockpit/TodosPage'
 import KnowledgePage from '../features/cockpit/KnowledgePage'
+import OpenForEdit from '../components/OpenForEdit'
+import { changeApi } from '../features/change/changeApi'
+import { iceApi } from '../features/ice/iceApi'
 
 export default function AppRouter() {
   return (
@@ -26,11 +29,13 @@ export default function AppRouter() {
         <Route path="knowledge" element={<KnowledgePage />} />
         <Route path="changes" element={<ChangeListPage />} />
         <Route path="changes/new" element={<ChangeNewPage />} />
+        <Route path="changes/update" element={<OpenForEdit title="更新变更单" base="/changes" placeholder="单号,如 CHG0012345" list={() => changeApi.list()} />} />
         <Route path="changes/:number" element={<ChangeDetailPage />} />
         <Route path="history" element={<HistoryPage />} />
         <Route path="templates" element={<TemplatesPage />} />
         <Route path="ices" element={<IceListPage />} />
         <Route path="ices/new" element={<IceNewPage />} />
+        <Route path="ices/update" element={<OpenForEdit title="更新 ICE" base="/ices" placeholder="ICE 号" list={() => iceApi.list()} />} />
         <Route path="ices/:id" element={<IceDetailPage />} />
         <Route path="ledger" element={<LedgerPage />} />
         <Route path="forms" element={<FormsPage />} />

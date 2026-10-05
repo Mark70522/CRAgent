@@ -20,6 +20,7 @@ export const menuItems = [
     children: [
       { key: '/changes', label: '变更单列表' },
       { key: '/changes/new', label: '新建变更单' },
+      { key: '/changes/update', label: '更新变更单' },
       { key: '/history', label: '历史与分类' },
       { key: '/templates', label: '模板' },
     ],
@@ -31,6 +32,7 @@ export const menuItems = [
     children: [
       { key: '/ices', label: 'ICE 列表' },
       { key: '/ices/new', label: '登记 ICE' },
+      { key: '/ices/update', label: '更新 ICE' },
     ],
   },
   { key: '/ledger', icon: <DatabaseOutlined />, label: '本地台账' },

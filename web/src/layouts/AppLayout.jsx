@@ -8,9 +8,12 @@ const { Header, Sider, Content } = Layout
 export default function AppLayout() {
   const navigate = useNavigate()
   const location = useLocation()
-  // highlight the list item while on a detail page
-  const selected = location.pathname.startsWith('/changes/') && location.pathname !== '/changes/new' ? '/changes'
-    : location.pathname.startsWith('/ices/') && location.pathname !== '/ices/new' ? '/ices' : location.pathname
+  // on a detail page: "update" when it was opened for editing, otherwise the list
+  const editing = new URLSearchParams(location.search).get('edit') === '1'
+  const own = ['/changes/new', '/changes/update', '/ices/new', '/ices/update']
+  const selected = own.includes(location.pathname) ? location.pathname
+    : location.pathname.startsWith('/changes/') ? (editing ? '/changes/update' : '/changes')
+    : location.pathname.startsWith('/ices/') ? (editing ? '/ices/update' : '/ices') : location.pathname
 
   return (
     <Layout style={{ height: '100vh' }}>
