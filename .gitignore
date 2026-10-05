@@ -5,3 +5,7 @@ logs/
 .env
 cr-agent.yml
 cockpit/
+
+# DirLock: lock files and in-flight temp files of atomic writes
+.lock
+.*.tmp
