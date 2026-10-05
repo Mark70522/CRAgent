@@ -44,4 +44,21 @@ class FormCatalogTest {
         assertThat(byKey.get("flag")).containsEntry("type", "boolean");
         assertThat(c.learn("ice", Map.of("title", "again"))).isEmpty();
     }
+
+    @Test
+    void guessesEveryTypeFromTheValue() {
+        assertThat(FormCatalog.guessType("cmdb_ci", Map.of("value", "abc123", "display_value", "srv-01"))).isEqualTo("reference");
+        assertThat(FormCatalog.guessType("labels", Map.of("env", "prod", "tier", 1))).isEqualTo("object");
+        assertThat(FormCatalog.guessType("meta", Map.of("owner", Map.of("name", "x")))).isEqualTo("json");
+        assertThat(FormCatalog.guessType("servers", List.of("srv-01", "srv-02"))).isEqualTo("list");
+        assertThat(FormCatalog.guessType("steps", List.of(Map.of("no", 1, "text", "a")))).isEqualTo("table");
+        assertThat(FormCatalog.guessType("mixed", List.of("a", Map.of("b", List.of())))).isEqualTo("json");
+        assertThat(FormCatalog.guessType("active", true)).isEqualTo("boolean");
+        assertThat(FormCatalog.guessType("count", 3)).isEqualTo("number");
+        assertThat(FormCatalog.guessType("due", "2026-10-05")).isEqualTo("date");
+        assertThat(FormCatalog.guessType("at", "01:30")).isEqualTo("time");
+        assertThat(FormCatalog.guessType("mail", "a@b.com")).isEqualTo("email");
+        assertThat(FormCatalog.guessType("link", "https://x.y/z")).isEqualTo("url");
+        assertThat(FormCatalog.TYPES).contains("multiselect", "select", "text", "textarea", "datetime");
+    }
 }

@@ -85,5 +85,13 @@ pre { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
   .app-page { padding: 56px 16px 32px; }
 }
 
+/* tasks editor: drag handle and drop marker */
+.task-handle { cursor: grab; color: #86868B; padding: 4px; border-radius: 6px; display: inline-flex; }
+.task-handle:hover { background: rgba(0,0,0,0.05); color: #1D1D1F; }
+.task-handle:active { cursor: grabbing; }
+.task-drop-above > td { box-shadow: inset 0 2px 0 #007AFF; }
+.task-drop-below > td { box-shadow: inset 0 -2px 0 #007AFF; }
+.task-dragging > td { opacity: 0.45; }
+
 /* selected row in master-detail lists (templates page etc.) */
 .app-list-selected { background: rgba(0, 122, 255, 0.08) !important; }

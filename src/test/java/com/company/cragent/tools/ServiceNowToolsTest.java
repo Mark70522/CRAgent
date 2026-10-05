@@ -33,24 +33,24 @@ public class ServiceNowToolsTest {
     /** Minimal in-test client: remembers calls, returns what it was given. */
     public static class RecordingClient implements ServiceNowClient {
         final List<String> calls = new ArrayList<>();
-        final Map<String, Map<String, String>> store = new HashMap<>();
+        final Map<String, Map<String, Object>> store = new HashMap<>();
         public ChangeRecord getChange(String number) {
             calls.add("get " + number);
-            Map<String, String> f = store.get(number);
+            Map<String, Object> f = store.get(number);
             if (f == null) throw new com.company.cragent.servicenow.ServiceNowException("not found: " + number);
             return new ChangeRecord(number, f, List.of(), new ObjectMapper().valueToTree(f));
         }
         public ChangeRecord createChange(ChangeDraft draft) {
             calls.add("create " + draft.fields().get("short_description"));
-            Map<String, String> f = new LinkedHashMap<>(draft.fieldsAsText());
+            Map<String, Object> f = new LinkedHashMap<>(draft.fields());
             f.put("number", "CHG0099");
             store.put("CHG0099", f);
-            return new ChangeRecord("CHG0099", f, draft.tasksAsText(), new ObjectMapper().valueToTree(f));
+            return new ChangeRecord("CHG0099", f, draft.tasks(), new ObjectMapper().valueToTree(f));
         }
         public ChangeRecord updateChange(String number, Map<String, Object> fields) {
             calls.add("update " + number + " " + fields);
-            Map<String, String> f = store.get(number);
-            fields.forEach((k, v) -> f.put(k, String.valueOf(v)));
+            Map<String, Object> f = store.get(number);
+            f.putAll(fields);
             return new ChangeRecord(number, f, List.of(), new ObjectMapper().valueToTree(f));
         }
         public TaskRecord createTask(String changeNumber, Map<String, Object> fields) { calls.add("task+ " + changeNumber + " " + fields); return new TaskRecord("TASK1", changeNumber, Map.of("sys_id", "TASK1", "short_description", String.valueOf(fields.get("short_description"))), null); }

@@ -38,7 +38,7 @@ public class CompanyServiceNowClient implements ServiceNowClient {
         // Example (adjust path and the result location to your interface):
         //   JsonNode resp = http.get("/change/" + number);
         //   JsonNode rec  = SnHttp.path(resp, "data");            // where the record is in the response
-        //   return new ChangeRecord(number, SnHttp.flatten(rec), SnHttp.flattenList(rec.get("tasks")), resp);
+        //   return new ChangeRecord(number, SnHttp.values(rec), SnHttp.valuesList(rec.get("tasks")), resp);
         throw new ServiceNowException("CompanyServiceNowClient.getChange is not implemented yet");
     }
 
@@ -50,7 +50,7 @@ public class CompanyServiceNowClient implements ServiceNowClient {
         //   body.put("tasks", draft.tasks());                      // or a separate call per task
         //   JsonNode resp = http.post("/change", body);
         //   JsonNode rec  = SnHttp.path(resp, "data");
-        //   return new ChangeRecord(rec.path("number").asText(), SnHttp.flatten(rec), SnHttp.flattenList(rec.get("tasks")), resp);
+        //   return new ChangeRecord(rec.path("number").asText(), SnHttp.values(rec), SnHttp.valuesList(rec.get("tasks")), resp);
         throw new ServiceNowException("CompanyServiceNowClient.createChange is not implemented yet");
     }
 
@@ -59,7 +59,7 @@ public class CompanyServiceNowClient implements ServiceNowClient {
         // TODO 3/3: update fields of an existing change request.
         //   JsonNode resp = http.patch("/change/" + number, fields);   // or put / post, as your interface wants
         //   JsonNode rec  = SnHttp.path(resp, "data");
-        //   return new ChangeRecord(number, SnHttp.flatten(rec), SnHttp.flattenList(rec.get("tasks")), resp);
+        //   return new ChangeRecord(number, SnHttp.values(rec), SnHttp.valuesList(rec.get("tasks")), resp);
         throw new ServiceNowException("CompanyServiceNowClient.updateChange is not implemented yet");
     }
 
@@ -69,7 +69,7 @@ public class CompanyServiceNowClient implements ServiceNowClient {
         //   Map<String, Object> body = new LinkedHashMap<>(fields); body.put("change_request", changeNumber);
         //   JsonNode resp = http.post("/change/" + changeNumber + "/task", body);
         //   JsonNode rec  = SnHttp.path(resp, "data");
-        //   return new TaskRecord(rec.path("sys_id").asText(), changeNumber, SnHttp.flatten(rec), resp);
+        //   return new TaskRecord(rec.path("sys_id").asText(), changeNumber, SnHttp.values(rec), resp);
         throw new ServiceNowException("CompanyServiceNowClient.createTask is not implemented yet");
     }
 
@@ -77,7 +77,7 @@ public class CompanyServiceNowClient implements ServiceNowClient {
     public TaskRecord cancelTask(String taskId, Map<String, Object> fields) {
         // TODO task 2/3: cancel a task.
         //   JsonNode resp = http.post("/task/" + taskId + "/cancel", fields);
-        //   return new TaskRecord(taskId, null, SnHttp.flatten(SnHttp.path(resp, "data")), resp);
+        //   return new TaskRecord(taskId, null, SnHttp.values(SnHttp.path(resp, "data")), resp);
         throw new ServiceNowException("CompanyServiceNowClient.cancelTask is not implemented yet");
     }
 
@@ -85,7 +85,7 @@ public class CompanyServiceNowClient implements ServiceNowClient {
     public TaskRecord closeTask(String taskId, Map<String, Object> fields) {
         // TODO task 3/3: close a task.
         //   JsonNode resp = http.post("/task/" + taskId + "/close", fields);
-        //   return new TaskRecord(taskId, null, SnHttp.flatten(SnHttp.path(resp, "data")), resp);
+        //   return new TaskRecord(taskId, null, SnHttp.values(SnHttp.path(resp, "data")), resp);
         throw new ServiceNowException("CompanyServiceNowClient.closeTask is not implemented yet");
     }
 

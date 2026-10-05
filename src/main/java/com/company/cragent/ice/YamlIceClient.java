@@ -68,8 +68,8 @@ public class YamlIceClient implements IceClient {
     }
 
     private IceRecord record(String id, JsonNode rec) {
-        Map<String, String> raw = SnHttp.flatten(rec);
-        String i = id != null ? id : raw.getOrDefault(props.idField(), "");
+        Map<String, Object> raw = SnHttp.values(rec);
+        String i = id != null ? id : com.company.cragent.model.Values.text(raw.get(props.idField()));
         return new IceRecord(i, names.in(raw), rec);
     }
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Alert, Button, Card, Space, Tag, Typography, App } from 'antd'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { diffFields } from '../../components/JsonForm'
+import { toPayload } from '../../components/fieldTypes'
 import FieldsEditor from '../../components/FieldsEditor'
 import JsonPanel from '../../components/JsonPanel'
 import TaskPanel from './TaskPanel'
@@ -32,7 +33,7 @@ export default function ChangeDetailPage() {
     const d = diffFields(rec.fields, value)
     if (!Object.keys(d).length) { message.info('没有改动'); return }
     setBusy(true)
-    try { await changeApi.update(number, d); message.success(`已保存 ${Object.keys(d).length} 个字段`); await load(false) }
+    try { await changeApi.update(number, toPayload(catalog, d)); message.success(`已保存 ${Object.keys(d).length} 个字段`); await load(false) }
     catch (e) { message.error(e.message) } finally { setBusy(false) }
   }
   async function learn(keys) {

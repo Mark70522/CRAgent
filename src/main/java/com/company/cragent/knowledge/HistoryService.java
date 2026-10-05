@@ -72,10 +72,10 @@ public class HistoryService {
         for (Map<String, Object> r : records == null ? List.<Map<String, Object>>of() : records) {
             try {
                 JsonNode raw = json.valueToTree(r);
-                Map<String, String> fields = SnHttp.flatten(raw);
+                Map<String, Object> fields = SnHttp.values(raw);
                 fields.remove("tasks");
-                List<Map<String, String>> tasks = SnHttp.flattenList(raw.get("tasks"));
-                String number = fields.getOrDefault("number", "");
+                List<Map<String, Object>> tasks = SnHttp.valuesList(raw.get("tasks"));
+                String number = com.company.cragent.model.Values.text(fields.get("number"));
                 if (number.isBlank()) { failed.add("a record without 'number' was skipped"); continue; }
                 cache.putChange(sn.describe(new ChangeRecord(number, fields, tasks, raw)), "import");
                 ok.add(number);
@@ -225,7 +225,7 @@ public class HistoryService {
     @SuppressWarnings("unchecked")
     static Map<String, String> fieldsOf(Map<String, Object> rec) {
         Map<String, String> out = new LinkedHashMap<>();
-        if (rec.get("fields") instanceof Map<?, ?> m) m.forEach((k, v) -> out.put(String.valueOf(k), v == null ? "" : String.valueOf(v)));
+        if (rec.get("fields") instanceof Map<?, ?> m) m.forEach((k, v) -> out.put(String.valueOf(k), com.company.cragent.model.Values.text(v)));
         return out;
     }
 
@@ -277,9 +277,9 @@ public class HistoryService {
             if (!(o instanceof Map<?, ?> m)) continue;
             Map<String, Object> t = new LinkedHashMap<>();
             t.put("order", order);
-            Object title = m.get("short_description"); if (title != null) t.put("short_description", String.valueOf(title));
-            Object desc = m.get("description"); if (desc != null && !String.valueOf(desc).isBlank()) t.put("description", String.valueOf(desc));
-            Object grp = m.get("assignment_group"); if (grp != null && !String.valueOf(grp).isBlank()) t.put("assignment_group", String.valueOf(grp));
+            String title = com.company.cragent.model.Values.text(m.get("short_description")); if (!title.isBlank()) t.put("short_description", title);
+            String desc = com.company.cragent.model.Values.text(m.get("description")); if (!desc.isBlank()) t.put("description", desc);
+            String grp = com.company.cragent.model.Values.text(m.get("assignment_group")); if (!grp.isBlank()) t.put("assignment_group", grp);
             int minutes = 30;
             try {
                 var a = java.time.LocalDateTime.parse(String.valueOf(m.get("planned_start_date")).replace(' ', 'T'));

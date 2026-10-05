@@ -98,7 +98,7 @@ public class IceTools {
     public Map<String, Object> iceScore(@ToolParam(description = "ICE record id") String iceId) {
         ready();
         IceRecord rec = ice.score(iceId.trim());
-        String score = rec.fields().getOrDefault(props.scoreField(), "");
+        String score = rec.text(props.scoreField());
         Map<String, Object> out = new LinkedHashMap<>(cache.putScore(iceId.trim(), score, describe(rec)));
         out.put("score", score);
         if (score.isBlank()) out.put("hint", "no key '" + props.scoreField() + "' in the response: set ice.score-field in cr-agent.yml to the right key (response keys: " + rec.fields().keySet() + ")");

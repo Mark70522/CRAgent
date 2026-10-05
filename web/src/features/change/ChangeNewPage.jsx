@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Card, Checkbox, Input, Segmented, Select, Space, Steps, Table, Tag, Typography, App } from 'antd'
+import { Alert, Button, Card, Checkbox, Input, Segmented, Select, Space, Steps, Tag, Typography, App } from 'antd'
 import JsonEditor from '../../components/JsonEditor'
 import { useNavigate } from 'react-router-dom'
 import FieldsEditor from '../../components/FieldsEditor'
+import TasksEditor from '../../components/TasksEditor'
+import { toPayload } from '../../components/fieldTypes'
 import { changeApi, formsApi } from './changeApi'
 
 /** Template -> draft -> edit fields and tasks -> validate -> create. Same gate as Copilot: hard-rule errors block creation. */
@@ -22,7 +24,6 @@ export default function ChangeNewPage() {
   const [tasks, setTasks] = useState([])
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [taskMode, setTaskMode] = useState('table')
 
   useEffect(() => {
     changeApi.templates().then((t) => { setTemplates(t); if (t[0]) setTemplate(t[0].name) }).catch((e) => message.error(e.message))
@@ -65,16 +66,11 @@ export default function ChangeNewPage() {
   }
   async function create() {
     setBusy(true)
-    try { const r = await changeApi.create(fields, tasks); message.success(`已创建 ${r.number}`); navigate(`/changes/${encodeURIComponent(r.number)}`) }
+    try { const r = await changeApi.create(toPayload(catalog, fields), tasks.map((t) => toPayload(taskCatalog, t))); message.success(`已创建 ${r.number}`); navigate(`/changes/${encodeURIComponent(r.number)}`) }
     catch (e) { message.error(e.message) } finally { setBusy(false) }
   }
 
   const step = !fields ? 0 : result ? (result.passed ? 3 : 2) : 1
-  const taskKeys = tasks.length ? [...new Set(tasks.flatMap((t) => Object.keys(t)))] : taskCatalog.filter((f) => !f.readonly).map((f) => f.key).slice(0, 5)
-  const taskColumns = [
-    ...taskKeys.map((k) => ({ title: (taskCatalog.find((f) => f.key === k) || {}).label || k, dataIndex: k, render: (v, _, i) => <Input size="small" value={v ?? ''} onChange={(e) => setTasks(tasks.map((t, j) => j === i ? { ...t, [k]: e.target.value } : t))} /> })),
-    { title: '', width: 50, render: (_, __, i) => <Button size="small" type="text" danger onClick={() => setTasks(tasks.filter((_, j) => j !== i))}>×</Button> },
-  ]
 
   return (
     <div>
@@ -122,10 +118,8 @@ export default function ChangeNewPage() {
           <Card size="small" title="字段" extra={<span style={{ color: '#999', fontSize: 12 }}>把 &lt;TODO: …&gt; 都换成实际内容</span>} style={{ marginBottom: 12 }}>
             <FieldsEditor catalog={catalog} value={fields} onChange={setFields} hide={['number', 'state', 'approval', 'close_code', 'sys_updated_on']} />
           </Card>
-          <Card size="small" title="Tasks" style={{ marginBottom: 12 }} extra={<Space><Segmented size="small" value={taskMode} onChange={setTaskMode} options={[{ value: 'table', label: '表格' }, { value: 'json', label: 'JSON' }]} />{taskMode === 'table' && <Button size="small" onClick={() => setTasks([...tasks, {}])}>加一行</Button>}</Space>}>
-            {taskMode === 'table'
-              ? <Table rowKey={(_, i) => i} size="small" pagination={false} columns={taskColumns} dataSource={tasks} locale={{ emptyText: '没有 task' }} />
-              : <JsonEditor value={tasks} onChange={(v) => Array.isArray(v) && setTasks(v)} rows={12} />}
+          <Card size="small" title={`Tasks · ${tasks.length}`} style={{ marginBottom: 12 }}>
+            <TasksEditor catalog={taskCatalog} value={tasks} onChange={setTasks} />
           </Card>
           <Card size="small" title="发出去的请求体" style={{ marginBottom: 12 }} extra={<span style={{ color: '#999', fontSize: 12 }}>create-change 收到的就是这个,按 cr-agent.yml 的 body 模板和 field-map 渲染</span>}>
             <JsonEditor value={{ fields, tasks }} onChange={(v) => { if (v && typeof v === 'object') { if (v.fields) setFields(v.fields); if (Array.isArray(v.tasks)) setTasks(v.tasks) } }} rows={14} />

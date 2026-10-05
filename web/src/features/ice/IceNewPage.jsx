@@ -3,6 +3,7 @@ import { Alert, Button, Card, Input, Space, Typography, App } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import FieldsEditor from '../../components/FieldsEditor'
 import { iceApi } from './iceApi'
+import { toPayload } from '../../components/fieldTypes'
 import { formsApi } from '../change/changeApi'
 
 /** Register a change request in ICE: fields derived by ice.from-change, edited here, then create-ice. */
@@ -30,7 +31,7 @@ export default function IceNewPage() {
   }
   async function create() {
     setBusy(true)
-    try { const r = await iceApi.create(number.trim(), fields); message.success(`已登记 ICE ${r.id}`); navigate(`/ices/${encodeURIComponent(r.id)}`) }
+    try { const r = await iceApi.create(number.trim(), toPayload(catalog, fields)); message.success(`已登记 ICE ${r.id}`); navigate(`/ices/${encodeURIComponent(r.id)}`) }
     catch (e) { message.error(e.message) } finally { setBusy(false) }
   }
 

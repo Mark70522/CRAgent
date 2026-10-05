@@ -1,12 +1,14 @@
 import { useMemo } from 'react'
-import { Button, Input, Select, Space, Tag, Typography } from 'antd'
+import { Button, Space, Tag, Typography } from 'antd'
+import FieldControl from './FieldControl'
+import { WIDE, guessType, same } from './fieldTypes'
 
 /**
  * A form that knows nothing about the record: it renders whatever the field catalog says
  * (knowledge/forms/<kind>.json) and shows keys the record has but the catalog does not under "其他字段".
  *
  * @param {Array}    catalog   [{ key, label, type, section, required, readonly, options, order, hint }]
- * @param {Object}   value     { key: string }  (all values are strings - what the interface returned)
+ * @param {Object}   value     { key: any JSON }  (types kept as the interface returned them)
  * @param {Object}   original  the values before editing; changed fields are highlighted
  * @param {Function} onChange  (nextValue) => void
  * @param {boolean}  readonly  show only
@@ -29,28 +31,14 @@ export default function JsonForm({ catalog = [], value = {}, original, onChange,
   }, [catalog, value, hide])
 
   const set = (key, v) => onChange && onChange({ ...value, [key]: v })
-  const changed = (key) => original && String(original[key] ?? '') !== String(value[key] ?? '')
+  const changed = (key) => original && !same(original[key], value[key])
 
-  const control = (f) => {
-    const v = value[f.key] ?? ''
-    const disabled = readonly || f.readonly
-    const common = { disabled, status: changed(f.key) ? 'warning' : undefined }
-    switch (f.type) {
-      case 'textarea':
-        return <Input.TextArea {...common} value={v} autoSize={{ minRows: 3, maxRows: 14 }} onChange={(e) => set(f.key, e.target.value)} />
-      case 'select':
-        return <Select {...common} value={v || undefined} allowClear style={{ width: '100%' }} options={(f.options || []).map((o) => typeof o === 'string' ? { value: o, label: o } : o)} onChange={(x) => set(f.key, x ?? '')} />
-      case 'boolean':
-        return <Select {...common} value={v || undefined} allowClear style={{ width: '100%' }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} onChange={(x) => set(f.key, x ?? '')} />
-      case 'datetime':
-        return <Input {...common} value={v} placeholder="yyyy-MM-dd HH:mm:ss" onChange={(e) => set(f.key, e.target.value)} />
-      default:
-        return <Input {...common} value={v} onChange={(e) => set(f.key, e.target.value)} />
-    }
-  }
+  const control = (f) => (
+    <FieldControl f={effective(f, value[f.key])} value={value[f.key]} onChange={(x) => set(f.key, x)} disabled={readonly || f.readonly} status={changed(f.key) ? 'warning' : undefined} />
+  )
 
-  const field = (f) => (
-    <div key={f.key} style={{ gridColumn: f.type === 'textarea' ? '1 / -1' : undefined, display: 'flex', flexDirection: 'column', gap: 4 }}>
+  const field = (raw) => { const f = effective(raw, value[raw.key]); return (
+    <div key={f.key} style={{ gridColumn: WIDE.includes(f.type) ? '1 / -1' : undefined, display: 'flex', flexDirection: 'column', gap: 4 }}>
       <label style={{ fontSize: 12, color: '#888' }}>
         {f.label || f.key}{f.required && <span style={{ color: '#cf1322' }}> *</span>}
         {f.label && f.label !== f.key && <span style={{ marginLeft: 6, color: '#bbb' }}>{f.key}</span>}
@@ -58,8 +46,9 @@ export default function JsonForm({ catalog = [], value = {}, original, onChange,
       </label>
       {control(f)}
       {f.hint && <span style={{ fontSize: 12, color: '#aaa' }}>{f.hint}</span>}
+      {f.mismatch && <span style={{ fontSize: 12, color: '#FF9500' }}>目录里是 {f.mismatch},实际值是 {f.type},按实际值编辑;可在「字段目录」把类型改成 {f.type}</span>}
     </div>
-  )
+  ) }
 
   return (
     <div>
@@ -78,7 +67,7 @@ export default function JsonForm({ catalog = [], value = {}, original, onChange,
             {onLearn && !readonly && <Button size="small" onClick={() => onLearn(sections.unknown)}>全部收进目录</Button>}
           </Space>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px 18px', marginTop: 8 }}>
-            {sections.unknown.map((k) => field({ key: k, label: k, type: String(value[k] ?? '').length > 120 ? 'textarea' : 'text' }))}
+            {sections.unknown.map((k) => field({ key: k, label: k, type: guessType(k, value[k]) }))}
           </div>
         </div>
       )}
@@ -86,9 +75,20 @@ export default function JsonForm({ catalog = [], value = {}, original, onChange,
   )
 }
 
+const STRUCTURED = ['list', 'multiselect', 'object', 'table', 'reference', 'json']
+
+/**
+ * The catalog says how to show a field, but a list or object must never be edited in a text box (it would be
+ * sent back as a string). When the value is structured and the catalog type is not, the value's own type wins.
+ */
+function effective(f, v) {
+  if (v == null || typeof v !== 'object' || STRUCTURED.includes(f.type)) return f
+  return { ...f, type: guessType(f.key, v), mismatch: f.type || 'text' }
+}
+
 /** The keys whose value differs from the original: what an update should send. */
 export function diffFields(original = {}, value = {}) {
   const out = {}
-  for (const k of Object.keys(value)) if (String(original[k] ?? '') !== String(value[k] ?? '')) out[k] = value[k]
+  for (const k of Object.keys(value)) if (!same(original[k], value[k])) out[k] = value[k]
   return out
 }

@@ -31,7 +31,7 @@ public class CompanyIceClient implements IceClient {
         // TODO 1/3: read one ICE record. Example:
         //   JsonNode resp = http.get("/ice/" + iceId);
         //   JsonNode rec  = SnHttp.path(resp, "data");
-        //   return new IceRecord(iceId, SnHttp.flatten(rec), resp);
+        //   return new IceRecord(iceId, SnHttp.values(rec), resp);
         throw new ServiceNowException("CompanyIceClient.get is not implemented yet");
     }
 
@@ -40,7 +40,7 @@ public class CompanyIceClient implements IceClient {
         // TODO: the ICE score. Example:
         //   JsonNode resp = http.get("/ice/" + iceId + "/score");
         //   JsonNode rec  = SnHttp.path(resp, "data");           // must contain the key named by ice.score-field
-        //   return new IceRecord(iceId, SnHttp.flatten(rec), resp);
+        //   return new IceRecord(iceId, SnHttp.values(rec), resp);
         throw new ServiceNowException("CompanyIceClient.score is not implemented yet");
     }
 
@@ -51,7 +51,7 @@ public class CompanyIceClient implements IceClient {
         //   body.put("changeNumber", changeNumber);
         //   JsonNode resp = http.post("/ice", body);
         //   JsonNode rec  = SnHttp.path(resp, "data");
-        //   return new IceRecord(rec.path("id").asText(), SnHttp.flatten(rec), resp);
+        //   return new IceRecord(rec.path("id").asText(), SnHttp.values(rec), resp);
         throw new ServiceNowException("CompanyIceClient.create is not implemented yet");
     }
 
@@ -60,7 +60,7 @@ public class CompanyIceClient implements IceClient {
         // TODO 3/3: update an ICE record.
         //   JsonNode resp = http.put("/ice/" + iceId, fields);
         //   JsonNode rec  = SnHttp.path(resp, "data");
-        //   return new IceRecord(iceId, SnHttp.flatten(rec), resp);
+        //   return new IceRecord(iceId, SnHttp.values(rec), resp);
         throw new ServiceNowException("CompanyIceClient.update is not implemented yet");
     }
 

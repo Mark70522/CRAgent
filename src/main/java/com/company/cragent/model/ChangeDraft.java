@@ -25,9 +25,6 @@ public record ChangeDraft(Map<String, Object> fields, List<Map<String, Object>> 
         return out;
     }
 
-    public static Map<String, String> asText(Map<String, Object> m) {
-        Map<String, String> out = new LinkedHashMap<>();
-        if (m != null) m.forEach((k, v) -> out.put(k, v == null ? "" : String.valueOf(v)));
-        return out;
-    }
+    /** Lists and objects become JSON text, reference objects their display value (see {@link Values#text}). */
+    public static Map<String, String> asText(Map<String, Object> m) { return Values.asText(m); }
 }

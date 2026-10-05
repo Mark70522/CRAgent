@@ -133,7 +133,7 @@ public class ServiceNowTools {
 
     /** Record -> number, fields, tasks, violations, passed, raw. Shared with the web viewer. */
     public Map<String, Object> describe(ChangeRecord rec) {
-        List<Violation> v = rules.validate(rec.fields(), rec.tasks());
+        List<Violation> v = rules.validate(rec.fieldsAsText(), rec.tasksAsText());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("number", rec.number());
         out.put("fields", rec.fields());

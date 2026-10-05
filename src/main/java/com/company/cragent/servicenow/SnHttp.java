@@ -118,25 +118,15 @@ public class SnHttp {
         return n == null ? MissingNode.getInstance() : n;
     }
 
-    /** Object node -> field name -> text; {value, display_value} objects become the display value; nested nodes become JSON text. */
-    public static Map<String, String> flatten(JsonNode node) {
-        Map<String, String> m = new LinkedHashMap<>();
-        if (node == null || !node.isObject()) return m;
-        node.fields().forEachRemaining(e -> {
-            JsonNode v = e.getValue();
-            if (v.isObject() && v.has("display_value")) m.put(e.getKey(), v.get("display_value").asText());
-            else if (v.isValueNode()) m.put(e.getKey(), v.isNull() ? "" : v.asText());
-            else m.put(e.getKey(), v.toString());
-        });
-        return m;
-    }
+    /** Object node -> field name -> value with its JSON type kept (lists stay lists, objects stay objects). Use this for records. */
+    public static Map<String, Object> values(JsonNode node) { return com.company.cragent.model.Values.of(node); }
 
-    public static List<Map<String, String>> flattenList(JsonNode node) {
-        List<Map<String, String>> out = new ArrayList<>();
-        if (node != null && node.isArray()) node.forEach(n -> out.add(flatten(n)));
-        else if (node != null && node.isObject()) out.add(flatten(node));
-        return out;
-    }
+    public static List<Map<String, Object>> valuesList(JsonNode node) { return com.company.cragent.model.Values.listOf(node); }
+
+    /** Text view of {@link #values}: {value, display_value} objects become the display value; lists / objects JSON text. */
+    public static Map<String, String> flatten(JsonNode node) { return com.company.cragent.model.Values.asText(values(node)); }
+
+    public static List<Map<String, String>> flattenList(JsonNode node) { return com.company.cragent.model.Values.asTextList(valuesList(node)); }
 
     public static String head(String s) { return s == null ? "" : s.length() > 300 ? s.substring(0, 300) + "..." : s; }
 

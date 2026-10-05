@@ -37,6 +37,7 @@ public class FormCatalog {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("kind", k);
         out.put("fields", fields(k));
+        out.put("types", TYPES);
         out.put("file", file(k).toString().replace('\\', '/'));
         return out;
     }
@@ -95,15 +96,41 @@ public class FormCatalog {
         return added;
     }
 
+    /**
+     * Every type the page can edit. Simple: text textarea number boolean select multiselect date datetime time
+     * email url. Structured: list (array of simple values), object (flat key/value object), table (array of
+     * objects), reference ({value, display_value}), json (anything else, edited as JSON).
+     */
+    public static final List<String> TYPES = List.of("text", "textarea", "number", "boolean", "select", "multiselect",
+            "date", "datetime", "time", "email", "url", "list", "object", "table", "reference", "json");
+
     static String guessType(String key, Object v) {
+        if (v instanceof Map<?, ?> m) {
+            if (m.containsKey("display_value") || (m.containsKey("value") && m.containsKey("link"))) return "reference";
+            return m.values().stream().allMatch(FormCatalog::simple) ? "object" : "json";
+        }
+        if (v instanceof List<?> l) {
+            if (l.stream().allMatch(FormCatalog::simple)) return "list";
+            if (l.stream().allMatch(x -> x instanceof Map<?, ?> xm && xm.values().stream().allMatch(FormCatalog::simple))) return "table";
+            return "json";
+        }
+        if (v instanceof Boolean) return "boolean";
+        if (v instanceof Number) return "number";
         String s = v == null ? "" : String.valueOf(v);
         String kl = key.toLowerCase();
-        if (kl.contains("date") || kl.endsWith("_on") || kl.endsWith("_at") || s.matches("\\d{4}-\\d{2}-\\d{2}.*")) return "datetime";
+        if (s.matches("\\d{4}-\\d{2}-\\d{2}")) return "date";
+        if (s.matches("\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}.*")) return "datetime";
+        if (s.matches("\\d{2}:\\d{2}(:\\d{2})?")) return "time";
+        if (s.isEmpty() && (kl.contains("date") || kl.endsWith("_on") || kl.endsWith("_at"))) return "datetime";
+        if (s.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) return "email";
+        if (s.matches("https?://\\S+")) return "url";
         if (s.length() > 120 || s.contains("\n")) return "textarea";
         if (s.matches("-?\\d+(\\.\\d+)?") && !kl.contains("number")) return "number";
         if (s.equalsIgnoreCase("true") || s.equalsIgnoreCase("false")) return "boolean";
         return "text";
     }
+
+    private static boolean simple(Object o) { return o == null || o instanceof String || o instanceof Number || o instanceof Boolean; }
 
     public Path file(String kind) { return props.formsDir().resolve(kind(kind) + ".json"); }
 

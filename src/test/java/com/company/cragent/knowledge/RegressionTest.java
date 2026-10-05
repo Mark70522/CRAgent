@@ -25,7 +25,7 @@ class RegressionTest {
     }
 
     static ChangeRecord good(String number) {
-        Map<String, String> f = new LinkedHashMap<>();
+        Map<String, Object> f = new LinkedHashMap<>();
         f.put("number", number);
         f.put("short_description", "[PATCH] srv-app-01 - 2026-10 Windows monthly security patches");
         f.put("description", "1. 变更对象\nsrv-app-01 (prod, Windows Server 2019, Order Portal application server)\n\n2. 补丁清单及来源\n2026-10 Microsoft monthly security baseline from WSUS\n\n3. 影响范围\nOrder Portal front end unavailable for about 45 minutes, business owner informed\n\n4. 执行步骤\nsee change tasks\n\n5. 验证方法\nIIS returns 200, health check OK\n\n6. 回退方案\nrestore the VMware snapshot, about 20 minutes, rehearsed");
@@ -33,7 +33,7 @@ class RegressionTest {
         f.put("start_date", "2026-10-11 01:00:00"); f.put("end_date", "2026-10-11 05:00:00");
         f.put("justification", "Security compliance"); f.put("implementation_plan", "See tasks");
         f.put("backout_plan", "Restore snapshot, 20 min"); f.put("test_plan", "Health checks");
-        List<Map<String, String>> tasks = List.of(
+        List<Map<String, Object>> tasks = List.of(
                 Map.of("short_description", "Pre-check", "order", "10", "assignment_group", "Wintel Ops", "planned_start_date", "2026-10-11 01:00:00", "planned_end_date", "2026-10-11 01:30:00"),
                 Map.of("short_description", "Patch", "order", "20", "assignment_group", "Wintel Ops", "planned_start_date", "2026-10-11 01:30:00", "planned_end_date", "2026-10-11 03:30:00"));
         return new ChangeRecord(number, f, tasks, new ObjectMapper().valueToTree(f));

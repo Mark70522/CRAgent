@@ -89,18 +89,19 @@ public class YamlServiceNowClient implements ServiceNowClient {
     }
 
     private TaskRecord task(String id, String changeNumber, JsonNode rec) {
-        Map<String, String> fields = names.in(SnHttp.flatten(rec));
+        Map<String, Object> fields = names.in(SnHttp.values(rec));
+        Map<String, String> text = com.company.cragent.model.Values.asText(fields);
         String i = id;
-        if (i == null) for (String k : List.of(props.taskIdField(), "number", "id")) { String v = fields.get(k); if (v != null && !v.isBlank()) { i = v; break; } }
-        String cn = changeNumber != null ? changeNumber : fields.getOrDefault("change_request", fields.get("number"));
+        if (i == null) for (String k : List.of(props.taskIdField(), "number", "id")) { String v = text.get(k); if (v != null && !v.isBlank()) { i = v; break; } }
+        String cn = changeNumber != null ? changeNumber : text.getOrDefault("change_request", text.get("number"));
         return new TaskRecord(i == null ? "" : i, cn, fields, rec);
     }
 
     private ChangeRecord record(String number, JsonNode rec, String endpoint) {
         ServiceNowProperties.Endpoint ep = props.endpoints().get(endpoint);
-        List<Map<String, String>> tasks = ep == null || ep.tasks() == null || ep.tasks().isBlank() ? List.of() : names.inList(SnHttp.flattenList(SnHttp.path(rec, ep.tasks())));
-        Map<String, String> fields = names.in(SnHttp.flatten(rec));
-        String n = number != null ? number : fields.getOrDefault("number", "");
+        List<Map<String, Object>> tasks = ep == null || ep.tasks() == null || ep.tasks().isBlank() ? List.of() : names.inList(SnHttp.valuesList(SnHttp.path(rec, ep.tasks())));
+        Map<String, Object> fields = names.in(SnHttp.values(rec));
+        String n = number != null ? number : com.company.cragent.model.Values.text(fields.get("number"));
         return new ChangeRecord(n, fields, tasks, rec);
     }
 }
