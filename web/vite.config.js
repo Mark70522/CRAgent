@@ -9,6 +9,7 @@ export default defineConfig({
   base: '/app/',
   server: {
     port: 5173,
+    strictPort: true,   // 5173 taken = a dev server already runs: fail instead of quietly starting a second one on 5174
     proxy: { '/api': 'http://127.0.0.1:7777' },
   },
   build: {
