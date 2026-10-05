@@ -27,15 +27,13 @@ public class ValidationTools {
         }
     }
 
-    @Tool(name = "validate_draft", description = """
-            Run the hard rules (knowledge/rules/hard-rules.yaml) against a draft. Fix every error and re-validate
-            until passed=true. Soft rules (soft-rules.md) are not checked here; review them yourself.""")
-    public ValidationResult validateDraft(@ToolParam(description = "The draft") ChangeDraft draft) {
+    @Tool(name = "validate_draft", description = "Check a draft against the hard rules (soft rules are yours to judge).")
+    public ValidationResult validateDraft(ChangeDraft draft) {
         return ValidationResult.of(rules.validateValues(draft.fields(), draft.tasks()));
     }
 
-    @Tool(name = "validate_change", description = "Run the hard rules against an existing change request (read through get-change).")
-    public ValidationResult validateChange(@ToolParam(description = "Change number") String number) {
+    @Tool(name = "validate_change", description = "Check an existing CR against the hard rules.")
+    public ValidationResult validateChange(String number) {
         @SuppressWarnings("unchecked")
         List<Violation> v = (List<Violation>) sn.getChange(number).get("violations");
         return ValidationResult.of(v);

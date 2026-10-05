@@ -45,19 +45,15 @@ public class KnowledgeTools {
 
     public record Rules(List<HardRule> hardRules, String softRules) {}
 
-    @Tool(name = "read_rules", description = "Current rule set: hard rules (machine-checked) and soft rules (judged by you). Read at the start of every create or review.")
+    @Tool(name = "read_rules", description = "Hard rules (machine-checked) and soft rules (yours to judge). Read before drafting or reviewing.")
     public Rules readRules() {
         return new Rules(rules.loadRules(), readOrEmpty(props.rulesDir().resolve("soft-rules.md")));
     }
 
-    @Tool(name = "add_hard_rule", description = """
-            Append one machine-checkable rule (YAML mapping: id, description, type, field, ...) to hard-rules.yaml and record
-            it in changelog.md. Parsed first; rejected if invalid or the id exists. Afterwards the rule regression runs
-            automatically and its result is returned: if an approved example now fails, the rule is too strict - fix or
-            remove it (tell the user). Only call after the user confirmed the rule.""")
+    @Tool(name = "add_hard_rule", description = "Add a hard rule after the user confirmed it; returns the regression result (an approved example failing = rule too strict).")
     public String addHardRule(
-            @ToolParam(description = "YAML for one rule, e.g. \"id: HR-020\\ndescription: ...\\ntype: required\\nfield: backout_plan\"") String ruleYaml,
-            @ToolParam(description = "Why: who asked / which rejection") String reason) {
+            @ToolParam(description = "One rule as YAML: id, description, type, field …") String ruleYaml,
+            @ToolParam(description = "Who asked / which rejection") String reason) {
         String normalized = "  - " + ruleYaml.strip().replace("\n", "\n    ");
         List<HardRule> parsed = RuleEngine.parseRules(new ByteArrayInputStream(("rules:\n" + normalized + "\n").getBytes(StandardCharsets.UTF_8)));
         if (parsed.size() != 1 || parsed.get(0).id() == null || parsed.get(0).type() == null)
@@ -69,40 +65,34 @@ public class KnowledgeTools {
         return "Added hard rule " + r.id() + ". Regression: " + Regression.summary(regression.run());
     }
 
-    @Tool(name = "add_soft_rule", description = "Append a judgement rule (wording, level of detail) to soft-rules.md and record it in changelog.md. Only after the user confirmed.")
+    @Tool(name = "add_soft_rule", description = "Add a judgement rule after the user confirmed it.")
     public String addSoftRule(
-            @ToolParam(description = "Rule id like SR-010") String id,
-            @ToolParam(description = "The rule, one or two sentences") String text,
-            @ToolParam(description = "Why: who asked / which rejection") String reason) {
+            @ToolParam(description = "SR-010") String id,
+            String text,
+            @ToolParam(description = "Who asked / which rejection") String reason) {
         append(props.rulesDir().resolve("soft-rules.md"), "\n### " + id + "\n" + text.strip() + "\n\n_Why:_ " + reason.strip() + " (" + LocalDate.now() + ")\n");
         appendChangelog("soft", id, text.strip().lines().findFirst().orElse(""), reason);
         return "Added soft rule " + id;
     }
 
-    @Tool(name = "save_example", description = """
-            Archive an APPROVED change request (read through get-change) under knowledge/examples/<category>/ as YAML.
-            It becomes both a writing example for future drafts and a regression case: from now on no rule may fail it.""")
-    public String saveExample(@ToolParam(description = "Change number") String number,
-                              @ToolParam(description = "Category = template name, e.g. os-patch, db-patch, app-release") String category) {
+    @Tool(name = "save_example", description = "Archive an approved CR as a writing example and regression case.")
+    public String saveExample(String number,
+                              @ToolParam(description = "Template name, e.g. os-patch") String category) {
         ChangeRecord rec = sn.getChange(number.trim());
         Path f = examples.saveApproved(rec, category);
         return "Saved " + rel(f) + ". Regression: " + Regression.summary(regression.run());
     }
 
-    @Tool(name = "save_rejected", description = """
-            Archive a REJECTED change request under knowledge/rejected/ with the rejection reason and, when known, the ids
-            of the hard rules that should catch it. It becomes a regression case: the rules must keep tripping on it.""")
-    public String saveRejected(@ToolParam(description = "Change number") String number,
-                               @ToolParam(description = "Rejection reason as given by the approver or the boss") String reason,
-                               @ToolParam(description = "Hard rule ids that should fire on it, e.g. [HR-011]; empty if none yet", required = false) List<String> expectedRules) {
+    @Tool(name = "save_rejected", description = "Archive a rejected CR with the reason; rules must keep catching it.")
+    public String saveRejected(String number,
+                               @ToolParam(description = "As the approver gave it") String reason,
+                               @ToolParam(description = "Rule ids that should fire, e.g. [HR-011]", required = false) List<String> expectedRules) {
         ChangeRecord rec = sn.getChange(number.trim());
         Path f = examples.saveRejected(rec, reason, expectedRules);
         return "Saved " + rel(f) + ". Regression: " + Regression.summary(regression.run());
     }
 
-    @Tool(name = "eval_rules", description = """
-            Run the rule regression: every approved example must pass the hard rules, every rejected example must trip
-            them (and the rules it lists as expected). Run after changing rules or templates; report failures to the user.""")
+    @Tool(name = "eval_rules", description = "Rule regression: approved examples must pass, rejected ones must fail. Run after changing rules.")
     public Map<String, Object> evalRules() {
         Regression.Report rep = regression.run();
         Map<String, Object> m = new LinkedHashMap<>();
@@ -113,7 +103,7 @@ public class KnowledgeTools {
         return m;
     }
 
-    @Tool(name = "list_examples", description = "Archived examples (approved, by category) and rejected changes, with file paths for read_example.")
+    @Tool(name = "list_examples", description = "Archived approved examples by category and rejected CRs, with paths.")
     public Map<String, List<String>> listExamples() {
         Map<String, List<String>> out = new LinkedHashMap<>();
         out.put("approved", examples.approved().stream().map(e -> e.relative(examples.root()) + " : " + e.category() + " : " + e.fields().getOrDefault("short_description", "")).toList());
@@ -121,8 +111,8 @@ public class KnowledgeTools {
         return out;
     }
 
-    @Tool(name = "read_example", description = "Read one archived example or rejected file (YAML) by the path from list_examples.")
-    public String readExample(@ToolParam(description = "Relative path, e.g. examples/os-patch/CHG0012345.yaml") String relativePath) {
+    @Tool(name = "read_example", description = "One archived example by its path.")
+    public String readExample(@ToolParam(description = "Path from list_examples") String relativePath) {
         String s = examples.read(relativePath);
         return s.isEmpty() ? "(no such file: " + relativePath + ")" : s;
     }

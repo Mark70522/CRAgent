@@ -31,26 +31,21 @@ public class CockpitTools {
     /** One task as Copilot extracts it from pasted text. */
     public record TaskInput(
             String title,
-            @ToolParam(description = "Estimated minutes, ONLY if the user stated a duration. Leave empty otherwise; never guess.", required = false) Integer est,
-            @ToolParam(description = "Due date yyyy-MM-dd: when it must be finished, if stated", required = false) String due,
-            @ToolParam(description = "When the work itself runs, yyyy-MM-dd HH:mm (a maintenance window, a release slot), if stated and different from due", required = false) String scheduledAt,
-            @ToolParam(description = "Change request number if the text names one (CHG...)", required = false) String cr,
-            @ToolParam(description = "monthly | weekly | quarterly when the text says it recurs (每月 / 每周 / 每季度)", required = false) String repeat,
-            @ToolParam(description = "P1 must do today, P2 today, P3 can slip. Default P2", required = false) String priority,
-            @ToolParam(description = "Where it came from and any detail worth keeping: who asked, the original wording", required = false) String context,
-            @ToolParam(description = "Free tags, e.g. servicenow, patch, meeting", required = false) List<String> tags) {}
+            @ToolParam(description = "Minutes, only if the user said so", required = false) Integer est,
+            @ToolParam(description = "yyyy-MM-dd, must be done by", required = false) String due,
+            @ToolParam(description = "yyyy-MM-dd HH:mm, when the work runs", required = false) String scheduledAt,
+            @ToolParam(description = "CHG number", required = false) String cr,
+            @ToolParam(description = "weekly|monthly|quarterly", required = false) String repeat,
+            @ToolParam(description = "P1|P2|P3, default P2", required = false) String priority,
+            @ToolParam(description = "Original wording, who asked", required = false) String context,
+            @ToolParam(required = false) List<String> tags) {}
 
     public record SlotInput(String time, String label, @ToolParam(required = false) Integer minutes, @ToolParam(required = false) String taskId) {}
 
-    @Tool(name = "add_tasks", description = """
-            Store tasks extracted from text the user pasted (an email, meeting notes, a chat message, a one-liner).
-            Duplicates of open tasks (same or very similar title) are merged instead of created; the result says which.
-            Keep titles short and verb-first; put the original wording and who asked into context.
-            The result also lists `related`: finished tasks that look like each new one, with last time's est / spent /
-            CR number and the pitfall lines from their notes. Mention those to the user in one line each.""")
+    @Tool(name = "add_tasks", description = "Add tasks taken from pasted text. Near-duplicates of open tasks are merged. Returns created, mergedInto and related (similar finished tasks with their cost and pitfalls).")
     public Map<String, Object> addTasks(
-            @ToolParam(description = "Tasks to add") List<TaskInput> tasks,
-            @ToolParam(description = "Source label: paste (default), email, meeting, chat", required = false) String source) {
+            List<TaskInput> tasks,
+            @ToolParam(description = "paste|email|meeting|chat", required = false) String source) {
         List<Task> in = new ArrayList<>();
         for (TaskInput ti : tasks) {
             Task t = new Task();
@@ -67,11 +62,8 @@ public class CockpitTools {
         return out;
     }
 
-    @Tool(name = "list_tasks", description = """
-            List tasks. status filter: open (todo+doing+waiting, default), actionable (todo+doing), todo, doing,
-            waiting, done, dropped, all. Each task carries est (+estBy user|ai), due, scheduledAt (when it runs),
-            waitingOn, cr (linked change number), repeat, priority, plannedFor and carried (days it slipped).""")
-    public List<Task> listTasks(@ToolParam(description = "open | actionable | todo | doing | waiting | done | dropped | all", required = false) String status) {
+    @Tool(name = "list_tasks", description = "List tasks with all their fields.")
+    public List<Task> listTasks(@ToolParam(description = "open (default, incl. waiting)|actionable|todo|doing|waiting|done|dropped|all", required = false) String status) {
         String s = status == null || status.isBlank() ? "open" : status.trim().toLowerCase();
         return store.tasks().stream().filter(t -> switch (s) {
             case "all" -> true;
@@ -82,30 +74,22 @@ public class CockpitTools {
     }
 
     @Tool(name = "update_task", description = """
-            Update a task: fields is a map of column -> value among title, status (todo|doing|waiting|done|dropped),
-            waitingOn (what it waits for: approval, a reply, the window; setting it also sets status=waiting),
-            priority (P1|P2|P3), est (minutes), estBy (user|ai), spent (minutes), due (yyyy-MM-dd),
-            scheduledAt (yyyy-MM-dd HH:mm, when it runs), cr (change number), repeat (monthly|weekly|quarterly),
-            context, tags (comma separated). Optional note is appended to the task's own notes file with a timestamp.""")
+            Change task fields: title, status (todo|doing|waiting|done|dropped), waitingOn (sets waiting), priority,
+            est, estBy (user|ai), spent (minutes), due, scheduledAt, cr, ice, repeat, context, tags (comma separated).""")
     public Task updateTask(
-            @ToolParam(description = "Task id like T-0003") String id,
-            @ToolParam(description = "Fields to change", required = false) Map<String, String> fields,
-            @ToolParam(description = "A line to append to the task's notes", required = false) String note) {
+            @ToolParam(description = "T-0003") String id,
+            @ToolParam(required = false) Map<String, String> fields,
+            @ToolParam(description = "Line appended to the task's notes", required = false) String note) {
         return store.updateTask(id, fields == null ? Map.of() : fields, note);
     }
 
-    @Tool(name = "task_notes", description = "Read the notes file of a task: the pasted original, follow-ups, captured pitfalls.")
-    public String taskNotes(@ToolParam(description = "Task id") String id) {
+    @Tool(name = "task_notes", description = "A task's notes file: original text, follow-ups, pitfalls.")
+    public String taskNotes(String id) {
         String n = store.taskNotes(id);
         return n.isEmpty() ? "(no notes yet for " + id + ")" : n;
     }
 
-    @Tool(name = "get_day", description = """
-            Everything needed for the morning brief or a status check: the day's file (brief, plan, timeline, notes,
-            summary), the planned tasks in full, tasks carried over from earlier days, `attention` (waiting tasks,
-            runs scheduled within 7 days, runs whose scheduled time already passed, deadlines within 3 days or past
-            (dueSoon), open tasks with a CR number),
-            the last 7 closed days' stats and the knowledge topics that exist. date defaults to today.""")
+    @Tool(name = "get_day", description = "The day: plan, notes, carried-over and open tasks, attention (waiting, scheduled, overdueRun, dueSoon, withChange), recent stats, knowledge topics, previous day.")
     public Map<String, Object> getDay(@ToolParam(description = "yyyy-MM-dd, default today", required = false) String date) {
         Day day = store.day(date);
         Map<String, Task> byId = store.tasks().stream().collect(Collectors.toMap(t -> t.id, t -> t, (a, b) -> a, LinkedHashMap::new));
@@ -125,15 +109,12 @@ public class CockpitTools {
         return out;
     }
 
-    @Tool(name = "plan_day", description = """
-            Write the day's plan after the user confirmed it: the ordered task ids, the morning brief text
-            (what matters today and why, as shown to the user) and an optional timeline of slots.
-            Tasks planned on an earlier day get their carried counter increased.""")
+    @Tool(name = "plan_day", description = "Write today's plan (replaces it) after the user confirmed: ordered task ids, brief text, optional timeline.")
     public Day planDay(
             @ToolParam(description = "yyyy-MM-dd, default today", required = false) String date,
-            @ToolParam(description = "Task ids in priority order") List<String> taskIds,
-            @ToolParam(description = "The brief text shown to the user (2-5 sentences, why these tasks)", required = false) String brief,
-            @ToolParam(description = "Timeline slots: time HH:mm, label, minutes, taskId", required = false) List<SlotInput> timeline) {
+            @ToolParam(description = "In order") List<String> taskIds,
+            @ToolParam(required = false) String brief,
+            @ToolParam(description = "time is HH:mm", required = false) List<SlotInput> timeline) {
         List<Slot> slots = null;
         if (timeline != null) {
             slots = new ArrayList<>();
@@ -142,31 +123,23 @@ public class CockpitTools {
         return store.planDay(date, taskIds, brief, slots);
     }
 
-    @Tool(name = "capture_note", description = """
-            Append a quick note to today's log. kind: decision | pitfall | learned, or empty for a plain note
-            (a Chinese prefix 决定/坑/学到 in the text is also recognised). Link it to a task with taskId when it
-            is about one; the note is then also appended to that task's notes file.""")
+    @Tool(name = "capture_note", description = "Add a note to today's log (and to the task's notes when taskId is given).")
     public Note captureNote(
-            @ToolParam(description = "The note") String text,
-            @ToolParam(description = "decision | pitfall | learned", required = false) String kind,
-            @ToolParam(description = "Task id it belongs to", required = false) String taskId,
+            String text,
+            @ToolParam(description = "decision|pitfall|learned; a 决定/坑/学到 prefix also works", required = false) String kind,
+            @ToolParam(required = false) String taskId,
             @ToolParam(description = "yyyy-MM-dd, default today", required = false) String date) {
         return store.capture(date, text, kind, taskId);
     }
 
     public record MemoryItem(
-            @ToolParam(description = "The fact in one sentence, in the user's words, with the concrete number / name / step") String text,
-            @ToolParam(description = "rule (what approvers / the boss expect) | fact (about a system, server, service, person) | pitfall | decision | learned | preference (how the user wants things done)") String kind,
-            @ToolParam(description = "The user's sentence it came from, short", required = false) String source,
-            @ToolParam(description = "Task id it belongs to, if clear", required = false) String taskId) {}
+            @ToolParam(description = "One sentence, user's words") String text,
+            @ToolParam(description = "rule|fact|pitfall|decision|learned|preference") String kind,
+            @ToolParam(description = "User's sentence it came from", required = false) String source,
+            @ToolParam(required = false) String taskId) {}
 
-    @Tool(name = "remember", description = """
-            Keep what the conversation just revealed, without being asked: a rule the boss stated, a fact about a
-            system or server, a pitfall, a decision, a lesson, a preference of the user. Call it at the end of a reply,
-            once, with every item worth keeping; nothing to keep = do not call. Items land in today's notes marked
-            auto and are confirmed at evening close before they become knowledge or rules; duplicates of what is
-            already known are skipped and reported. Do not store questions, guesses, or things the tools returned.""")
-    public List<Map<String, Object>> remember(@ToolParam(description = "Items worth keeping") List<MemoryItem> items) {
+    @Tool(name = "remember", description = "Keep lasting facts the conversation revealed (see instructions: Memory). Once per reply, all items; skip when nothing. Confirmed at evening close.")
+    public List<Map<String, Object>> remember(List<MemoryItem> items) {
         List<Map<String, Object>> out = new ArrayList<>();
         for (MemoryItem it : items == null ? List.<MemoryItem>of() : items) {
             CockpitStore.Remembered r = store.remember(it.text(), it.kind(), it.source(), it.taskId());
@@ -180,14 +153,11 @@ public class CockpitTools {
         return out;
     }
 
-    @Tool(name = "close_day", description = """
-            Close the day: stores the one-line summary and the proposed task ids for tomorrow, marks the day closed
-            and records stats (planned/done/estimated minutes/notes). Returns the day plus digestCandidates:
-            notes with a kind that have not been saved to knowledge yet, for the user to confirm one by one.""")
+    @Tool(name = "close_day", description = "Close the day: summary, tomorrow's task ids, stats. Returns digestCandidates (notes not yet saved as knowledge).")
     public Map<String, Object> closeDay(
             @ToolParam(description = "yyyy-MM-dd, default today", required = false) String date,
-            @ToolParam(description = "One-line summary of the day") String summary,
-            @ToolParam(description = "Task ids proposed for tomorrow", required = false) List<String> tomorrowTaskIds) {
+            @ToolParam(description = "One line") String summary,
+            @ToolParam(required = false) List<String> tomorrowTaskIds) {
         Day day = store.closeDay(date, summary, tomorrowTaskIds);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("day", day);
@@ -201,63 +171,48 @@ public class CockpitTools {
         return out;
     }
 
-    @Tool(name = "save_knowledge", description = """
-            Keep something for good: appends a dated entry to knowledge/<topic>.md (created if new). Use an existing
-            topic when one fits (see get_day.knowledgeTopics); content is 1-5 sentences in the user's words.
-            Pass noteIndex (from close_day.digestCandidates) to mark that note as saved. Only after the user agreed.""")
+    @Tool(name = "save_knowledge", description = "Append a dated entry to knowledge/<topic>.md, only after the user agreed. noteIndex marks that day's note saved.")
     public Map<String, Object> saveKnowledge(
-            @ToolParam(description = "Topic, e.g. 'Oracle RU 补丁流程'") String topic,
-            @ToolParam(description = "Entry title, one line") String title,
-            @ToolParam(description = "The entry") String content,
-            @ToolParam(description = "yyyy-MM-dd it came from, default today", required = false) String sourceDate,
-            @ToolParam(description = "Task id it came from", required = false) String taskId,
-            @ToolParam(description = "Index of the note in that day's notes, to mark it saved", required = false) Integer noteIndex) {
+            @ToolParam(description = "Existing topic when one fits") String topic,
+            String title,
+            String content,
+            @ToolParam(description = "yyyy-MM-dd, default today", required = false) String sourceDate,
+            @ToolParam(required = false) String taskId,
+            @ToolParam(required = false) Integer noteIndex) {
         var file = store.saveKnowledge(topic, title, content, sourceDate, taskId);
         if (noteIndex != null) store.markNoteSaved(sourceDate == null ? CockpitStore.today() : sourceDate, noteIndex);
         return Map.of("file", store.dir().relativize(file).toString().replace('\\', '/'), "topic", topic);
     }
 
-    @Tool(name = "read_knowledge", description = "Read one knowledge topic file in full.")
-    public String readKnowledge(@ToolParam(description = "Topic name as listed") String topic) {
+    @Tool(name = "read_knowledge", description = "One knowledge topic file in full.")
+    public String readKnowledge(String topic) {
         String t = store.readKnowledge(topic);
         return t.isEmpty() ? "(no such topic: " + topic + ")" : t;
     }
 
-    @Tool(name = "search_knowledge", description = """
-            Search the knowledge files and task notes for a word or phrase. Use before answering any
-            'how did I do this last time' question, and quote the file in the answer.""")
-    public List<Map<String, String>> searchKnowledge(@ToolParam(description = "Word or phrase") String query) {
+    @Tool(name = "search_knowledge", description = "Search knowledge files and task notes. Use before answering about the user's past; name the file.")
+    public List<Map<String, String>> searchKnowledge(String query) {
         return store.search(query, 12);
     }
 
-    @Tool(name = "task_history", description = """
-            Task history sorted by time, newest first, each task with everything recorded about it: the days
-            it was planned, its linked notes, the knowledge entries that came out of it, its own notes file,
-            est vs spent, how often it slipped. Filter by keyword (matched against title, context, tags, notes
-            and knowledge), status (all | open | done | dropped) and a date range; sort by created (default),
-            done or updated. Use it for 'what did I do in September', 'when did I last touch X', 'show me
-            everything about the patch CR'.""")
+    @Tool(name = "task_history", description = "Past tasks, newest first, each with its planned days, notes, knowledge, est vs spent. For 'what did I do in …', 'when did I last …'.")
     public List<TaskHistory> taskHistory(
-            @ToolParam(description = "Keyword, optional", required = false) String query,
-            @ToolParam(description = "all | open | done | dropped, default all", required = false) String status,
-            @ToolParam(description = "From date yyyy-MM-dd, optional", required = false) String from,
-            @ToolParam(description = "To date yyyy-MM-dd, optional", required = false) String to,
-            @ToolParam(description = "created | done | updated, default created", required = false) String sort,
-            @ToolParam(description = "Max rows, default 30", required = false) Integer limit) {
+            @ToolParam(description = "Matches title, context, tags, notes, knowledge", required = false) String query,
+            @ToolParam(description = "all|open|done|dropped", required = false) String status,
+            @ToolParam(description = "yyyy-MM-dd", required = false) String from,
+            @ToolParam(description = "yyyy-MM-dd", required = false) String to,
+            @ToolParam(description = "created|done|updated", required = false) String sort,
+            @ToolParam(description = "default 30", required = false) Integer limit) {
         return store.history(query, status, from, to, sort, limit == null ? 30 : limit);
     }
 
-    @Tool(name = "cockpit_url", description = "The local address of the cockpit page (same data as these tools).")
+    @Tool(name = "cockpit_url", description = "Address of the web page.")
     public String url() {
         return props.webEnabled() ? "http://127.0.0.1:" + props.portNumber() + "/" : "(cockpit web page is disabled: cockpit.web=false)";
     }
 
-    @Tool(name = "open_cockpit", description = """
-            Open the web UI in the user's default browser (local page, nothing leaves the machine).
-            Call it once at the start of the morning brief and whenever the user asks to see the page.
-            view: today (default; morning / day / evening also land here) | todos (task history) | knowledge |
-            changes | ices | ledger (local copies) | dashboard.""")
-    public String openCockpit(@ToolParam(description = "Which view to open, default morning", required = false) String view) {
+    @Tool(name = "open_cockpit", description = "Open the web page in the user's browser.")
+    public String openCockpit(@ToolParam(description = "today (default)|todos|knowledge|changes|ices|ledger|dashboard", required = false) String view) {
         if (!props.webEnabled()) return "(cockpit web page is disabled: cockpit.web=false)";
         String v = view == null || view.isBlank() ? "morning" : view.trim().toLowerCase();
         // the React UI: old view names map onto its routes; unknown names fall back to the day page

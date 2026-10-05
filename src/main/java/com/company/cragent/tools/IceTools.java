@@ -39,12 +39,8 @@ public class IceTools {
         this.json = json;
     }
 
-    @Tool(name = "draft_ice", description = """
-            The ICE fields for a change request, derived deterministically from the CR by ice.from-change in
-            cr-agent.yml (ICE field -> template over the CR's fields, e.g. title: ${short_description}).
-            Uses the local copy of the CR when there is one, else reads it. Show the result to the user, apply
-            their corrections, then create_ice. Empty `fields` with a `hint` means from-change is not configured.""")
-    public Map<String, Object> draftIce(@ToolParam(description = "Change request number") String changeNumber) {
+    @Tool(name = "draft_ice", description = "ICE fields derived from a CR by ice.from-change in cr-agent.yml; a hint means it is not configured.")
+    public Map<String, Object> draftIce(String changeNumber) {
         String number = changeNumber.trim();
         Map<String, Object> cr = cache.get("change", number).orElseGet(() -> sn.getChange(number));
         @SuppressWarnings("unchecked") Map<String, Object> crFields = cr.get("fields") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
@@ -82,20 +78,16 @@ public class IceTools {
 
     private String toJson(Object v) { try { return json.writeValueAsString(v); } catch (Exception e) { return String.valueOf(v); } }
 
-    @Tool(name = "get_ice", description = """
-            Read one ICE record by id. Returns its fields and raw JSON, and stores a local copy under
-            cockpit/records/ice/ that the cockpit page shows. Pass changeNumber when you know which CR it belongs to.""")
+    @Tool(name = "get_ice", description = "Read an ICE record.")
     public Map<String, Object> getIce(
-            @ToolParam(description = "ICE record id") String iceId,
-            @ToolParam(description = "The CR number this record belongs to, if known", required = false) String changeNumber) {
+            String iceId,
+            @ToolParam(description = "Its CR, if known", required = false) String changeNumber) {
         ready();
         return cache.putIce(describe(ice.get(iceId.trim())), "get", changeNumber);
     }
 
-    @Tool(name = "ice_score", description = """
-            The ICE score of a record (ice-score endpoint). Returns the score (key ice.score-field, default score),
-            the full response, and appends the reading to the local record's score history.""")
-    public Map<String, Object> iceScore(@ToolParam(description = "ICE record id") String iceId) {
+    @Tool(name = "ice_score", description = "Current ICE score of a record (kept in its score history).")
+    public Map<String, Object> iceScore(String iceId) {
         ready();
         IceRecord rec = ice.score(iceId.trim());
         String score = rec.text(props.scoreField());
@@ -105,16 +97,12 @@ public class IceTools {
         return out;
     }
 
-    @Tool(name = "create_ice", description = """
-            Register a change request in ICE (the second system every CR has to be entered in). fields are named
-            exactly as the ICE interface expects. Set confirmed=true only after the user saw the fields and said
-            to send them. Pass taskId to record the ICE id on the cockpit task that owns this CR.
-            Refuses with a clear message when ICE is not configured (status shows it).""")
+    @Tool(name = "create_ice", description = "Register a CR in ICE. taskId records the ICE id on the cockpit task.")
     public Map<String, Object> createIce(
-            @ToolParam(description = "Change request number this ICE record is for") String changeNumber,
-            @ToolParam(description = "ICE field name -> value") Map<String, Object> fields,
-            @ToolParam(description = "Must be true; pass true only after the user explicitly confirmed") boolean confirmed,
-            @ToolParam(description = "Cockpit task id (T-0001), if any", required = false) String taskId) {
+            String changeNumber,
+            Map<String, Object> fields,
+            @ToolParam(description = "true only after the user explicitly agreed") boolean confirmed,
+            @ToolParam(description = "T-0001", required = false) String taskId) {
         ready();
         if (!confirmed) throw new IllegalStateException("Not sent: show the user the ICE fields and ask for confirmation, then call again with confirmed=true.");
         IceRecord rec = ice.create(changeNumber.trim(), fields == null ? Map.of() : fields);
@@ -130,13 +118,11 @@ public class IceTools {
         return out;
     }
 
-    @Tool(name = "update_ice", description = """
-            Update fields of an existing ICE record; field names exactly as the ICE interface expects.
-            Set confirmed=true only after the user explicitly agreed to the change.""")
+    @Tool(name = "update_ice", description = "Change fields of an ICE record (only the changed ones).")
     public Map<String, Object> updateIce(
-            @ToolParam(description = "ICE record id") String iceId,
-            @ToolParam(description = "ICE field name -> new value") Map<String, Object> fields,
-            @ToolParam(description = "Must be true; pass true only after the user explicitly confirmed") boolean confirmed) {
+            String iceId,
+            Map<String, Object> fields,
+            @ToolParam(description = "true only after the user explicitly agreed") boolean confirmed) {
         ready();
         if (!confirmed) throw new IllegalStateException("Not updated: show the user exactly what will change in ICE and ask for confirmation, then call again with confirmed=true.");
         IceRecord rec = ice.update(iceId.trim(), fields == null ? Map.of() : fields);

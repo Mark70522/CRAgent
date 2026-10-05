@@ -42,10 +42,7 @@ public class StatusTools {
         this.regression = regression; this.knowledge = knowledge; this.cockpit = cockpit; this.audit = audit;
     }
 
-    @Tool(name = "status", description = """
-            Health check of this installation: which ServiceNow client is active and what it talks to, inventory rows,
-            number of hard rules / templates / archived examples, whether the rule regression passes, cockpit page address,
-            audit log location. Call it first on a new machine or when something seems off.""")
+    @Tool(name = "status", description = "Health check: interfaces configured, inventory, rules, templates, examples, regression, tool groups, page address.")
     public Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("serviceNow", safe(sn::describe));

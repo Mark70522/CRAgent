@@ -40,15 +40,10 @@ public class TemplateTools {
     static final Set<String> NOT_COPIED = Set.of("number", "state", "approval", "close_code", "close_notes", "opened_at", "closed_at",
             "work_notes", "comments", "id", "kind", "task", "iceId");
 
-    @Tool(name = "draft_from_change", description = """
-            Start a new CR from an old one ("照着 CHG0031234 建一张"): copies its fields and tasks with their JSON
-            types kept, drops what must not be copied (number, state, approval, sys_* and fields marked read-only in
-            the field catalog), and clears every date-time field so no old date slips into the new CR. Reads the
-            local copy unless live=true (or there is none). Then: set title, times and the description for this
-            change, validate_draft, show the user, create_change.""")
+    @Tool(name = "draft_from_change", description = "Draft a new CR from an old one: fields and tasks copied, identity/state/read-only fields dropped, date-times cleared.")
     public DraftResult draftFromChange(
-            @ToolParam(description = "The old change number, e.g. CHG0031234") String number,
-            @ToolParam(description = "true = read it from the interface now instead of the local copy", required = false) Boolean live) {
+            String number,
+            @ToolParam(description = "true = read the interface, not the local copy", required = false) Boolean live) {
         String n = number.trim();
         Map<String, Object> rec = Boolean.TRUE.equals(live) ? null : cache.get("change", n).orElse(null);
         if (rec == null) rec = sn.getChange(n);
@@ -95,7 +90,7 @@ public class TemplateTools {
     public record TemplateSummary(String name, String description, List<String> matchKeywords, int taskCount) {}
     public record DraftResult(ChangeDraft draft, Map<String, String> fieldSources, List<String> notes) {}
 
-    @Tool(name = "list_templates", description = "The change templates under knowledge/templates. Pick the one whose keywords fit the request; ask if none fits.")
+    @Tool(name = "list_templates", description = "Change templates with their keywords.")
     public List<TemplateSummary> listTemplates() {
         List<TemplateSummary> out = new ArrayList<>();
         for (ChangeTemplate t : templates.listTemplates())
@@ -103,19 +98,15 @@ public class TemplateTools {
         return out;
     }
 
-    @Tool(name = "get_template", description = "Full definition of one template: default fields, task sequence with durations, description sections.")
-    public ChangeTemplate getTemplate(@ToolParam(description = "Template name") String name) { return templates.getTemplate(name.trim()); }
+    @Tool(name = "get_template", description = "One template in full.")
+    public ChangeTemplate getTemplate(String name) { return templates.getTemplate(name.trim()); }
 
-    @Tool(name = "build_draft", description = """
-            Build a draft from a template: resolves the servers in the inventory (if any), fills default fields, (if plannedStart is given) lays
-            the tasks out back to back and computes the change window, and puts a section skeleton with
-            <TODO: ...> markers into the description field. Field names are exactly what the template says (your
-            interface's names). Replace every TODO with real content, then validate_draft before showing the user.""")
+    @Tool(name = "build_draft", description = "Draft from a template: default fields, tasks (timed when plannedStart is given), description with <TODO> sections to fill.")
     public DraftResult buildDraft(
-            @ToolParam(description = "Template name from list_templates") String templateName,
-            @ToolParam(description = "Server names, comma separated; optional", required = false) String ciNames,
-            @ToolParam(description = "Planned start, yyyy-MM-dd HH:mm:ss; optional, without it no times are filled", required = false) String plannedStart,
-            @ToolParam(description = "One-line summary for the title; optional, without it the title is a TODO", required = false) String summary) {
+            String templateName,
+            @ToolParam(description = "Comma separated", required = false) String ciNames,
+            @ToolParam(description = "yyyy-MM-dd HH:mm:ss", required = false) String plannedStart,
+            @ToolParam(description = "For the title", required = false) String summary) {
         List<CiInfo> cis = new ArrayList<>();
         List<String> notes = new ArrayList<>();
         for (String n : (ciNames == null ? "" : ciNames).split(",")) {

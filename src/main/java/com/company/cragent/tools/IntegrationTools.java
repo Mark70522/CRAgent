@@ -43,23 +43,15 @@ public class IntegrationTools {
         this.json = json.copy().enable(SerializationFeature.INDENT_OUTPUT);
     }
 
-    @Tool(name = "check_config", description = """
-            Validate cr-agent.yml without calling anything: endpoint names, placeholders, result paths, auth
-            environment variables, field-map, ice.from-change. problems = will not work; notes = worth knowing.""")
+    @Tool(name = "check_config", description = "Check cr-agent.yml without calling anything: problems (will not work) and notes.")
     public Map<String, Object> checkConfig() { return check.summary(); }
 
-    @Tool(name = "probe", description = """
-            Try one endpoint from cr-agent.yml. send=false (default) only renders: method, full URL, per-endpoint
-            headers, body and how auth will be added - nothing leaves the machine. send=true sends it and returns
-            the WHOLE response plus what the endpoint's `result` path picks out of it (and `tasks`, if set).
-            api: servicenow | ice. endpoint: get-change / create-change / update-change / get-ice / create-ice /
-            update-ice. params: the placeholders, e.g. {"number": "CHG0012345"}. Use it to settle the yml on
-            the first day; afterwards use get_change / get_ice.""")
+    @Tool(name = "probe", description = "Try one endpoint of cr-agent.yml: render the request, or with send=true (a real call: confirm first) return the whole response.")
     public Map<String, Object> probe(
-            @ToolParam(description = "servicenow | ice") String api,
-            @ToolParam(description = "Endpoint name as in cr-agent.yml") String endpoint,
-            @ToolParam(description = "Placeholder values", required = false) Map<String, Object> params,
-            @ToolParam(description = "false = render only (default); true = really send", required = false) Boolean send) {
+            @ToolParam(description = "servicenow|ice") String api,
+            @ToolParam(description = "e.g. get-change") String endpoint,
+            @ToolParam(description = "Placeholders, e.g. {\"number\": \"CHG0012345\"}", required = false) Map<String, Object> params,
+            @ToolParam(required = false) Boolean send) {
         EndpointClient c = client(api);
         Map<String, Object> p = params == null ? Map.of() : params;
         EndpointClient.Rendered r = c.render(endpoint, p);
@@ -92,14 +84,10 @@ public class IntegrationTools {
         return out;
     }
 
-    @Tool(name = "save_fixture", description = """
-            Keep a real response as a test fixture: copies the raw response of a cached CR / ICE record to
-            knowledge/fixtures/<api>/<endpoint>.<id>.json, with the params that fetched it. `mvn test` then replays
-            it through cr-agent.yml (result path, tasks path, field-map) so a yml change that breaks parsing fails
-            the build. Remove or blank sensitive values in the file afterwards if needed.""")
+    @Tool(name = "save_fixture", description = "Keep a cached record's raw response as a test fixture so mvn test guards cr-agent.yml.")
     public Map<String, Object> saveFixture(
-            @ToolParam(description = "change | ice") String kind,
-            @ToolParam(description = "The record id (CHG number or ICE id) as cached") String id) {
+            @ToolParam(description = "change|ice") String kind,
+            String id) {
         Map<String, Object> rec = cache.get(kind, id).orElseThrow(() -> new IllegalArgumentException("Not cached: " + kind + " " + id + " (read it first with get_change / get_ice)"));
         String api = "ice".equals(kind) ? "ice" : "servicenow";
         String endpoint = "ice".equals(kind) ? "get-ice" : "get-change";

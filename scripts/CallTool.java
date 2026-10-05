@@ -59,6 +59,8 @@ public class CallTool {
                 int i = 0;
                 while ((i = line.indexOf("\"name\":\"", i)) >= 0) { int e = line.indexOf('"', i + 8); names.add(line.substring(i + 8, e)); i = e; }
                 System.out.println(names.size() + " tools: " + names);
+                // CALLTOOL_RAW=<file>: keep the raw tools/list response for a closer look
+                if (System.getenv("CALLTOOL_RAW") != null) java.nio.file.Files.writeString(Path.of(System.getenv("CALLTOOL_RAW")), line, StandardCharsets.UTF_8);
                 // what the client sends with every prompt: the whole definition list (~4 chars per token for this JSON)
                 System.out.println("definitions: " + line.length() + " chars, ~" + line.length() / 4 + " tokens");
                 List<int[]> starts = new ArrayList<>();

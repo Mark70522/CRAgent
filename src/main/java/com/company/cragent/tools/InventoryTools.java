@@ -18,22 +18,17 @@ public class InventoryTools {
 
     public InventoryTools(Inventory inv) { this.inv = inv; }
 
-    @Tool(name = "lookup_ci", description = """
-            Look up servers by name, partial name or IP in the inventory spreadsheet. Several names may be
-            comma separated. Returns environment, OS, owner group, service and maintenance window per server.
-            Always call this (or lookup_service) before drafting, so servers and owner groups are real.""")
-    public Map<String, List<CiInfo>> lookupCi(@ToolParam(description = "Server name(s) or IP(s), comma separated") String names) {
+    @Tool(name = "lookup_ci", description = "Servers from the inventory by name, part of a name or IP: environment, OS, owner group, service, window.")
+    public Map<String, List<CiInfo>> lookupCi(@ToolParam(description = "Comma separated") String names) {
         Map<String, List<CiInfo>> out = new LinkedHashMap<>();
         for (String n : names.split(",")) { String q = n.trim(); if (!q.isEmpty()) out.put(q, inv.lookup(q)); }
         return out;
     }
 
-    @Tool(name = "lookup_service", description = """
-            All servers of a service (application), optionally one environment. Use when the user names a
-            service instead of servers ("patch Order Portal prod"). Empty service lists the known services.""")
+    @Tool(name = "lookup_service", description = "All servers of a service, optionally one environment; empty service lists the services.")
     public Map<String, Object> lookupService(
-            @ToolParam(description = "Service name or part of it; empty to list services", required = false) String service,
-            @ToolParam(description = "prod / uat / dev ...; empty for all", required = false) String environment) {
+            @ToolParam(required = false) String service,
+            @ToolParam(description = "prod|uat|dev …", required = false) String environment) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("source", inv.source());
         if (service == null || service.isBlank()) { out.put("services", inv.services()); return out; }
